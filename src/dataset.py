@@ -148,6 +148,12 @@ class SpreadDataset(Dataset):
         self._i_next2 = self.bands.index("fire_next2") if "fire_next2" in self.bands else None
         self._i_valid = self.bands.index(SPREAD_VALID_BAND) if SPREAD_VALID_BAND in self.bands else None
         self._i_fire = self.bands.index("fire")
+        # v4 only: was the target actually observed, or was it cloud/no-data?
+        # Yalnızca v4: hedef gerçekten gözlendi mi, yoksa bulut/veri yok muydu?
+        self._i_vnext = (self.bands.index("valid_next")
+                         if "valid_next" in self.bands else None)
+        self._i_vnext2 = (self.bands.index("valid_next2")
+                          if "valid_next2" in self.bands else None)
 
         if indices is not None:
             self.indices = np.asarray(indices)
@@ -171,6 +177,40 @@ class SpreadDataset(Dataset):
         """Full uncropped band stack for one patch. / Kırpılmamış tam yığın."""
         return np.asarray(self.array[self.indices[i]], dtype=np.float32)
 
+    def _target_valid(self, block, y):
+        """Mask of target pixels we are entitled to treat as ground truth.
+        Hedefte gerçek referans sayabileceğimiz piksellerin maskesi.
+
+        v2/v3 wrote a literal 0 wherever MODIS did not look, so "cloud" and
+        "no fire" were the same number. Training on that teaches the network
+        cloud patterns. v4 exports valid_next/valid_next2 and this is where
+        they are spent.
+
+        The rule is asymmetric, because the evidence is:
+          * a DETECTION is trustworthy on its own — if we saw fire, there was
+            fire, regardless of what the other day looked like;
+          * an ABSENCE is only evidence if we actually looked. With
+            target = max(fire_next, fire_next2), a zero is only trustworthy
+            when BOTH days were observed.
+
+        Kural asimetriktir: bir TESPİT tek başına güvenilirdir; bir YOKLUK ise
+        ancak gerçekten bakıldıysa kanıttır.
+
+        Returns all-ones for v2/v3, so behaviour is unchanged there.
+        """
+        if self._i_vnext is None:
+            return np.ones_like(y)
+
+        obs1 = block[self._i_vnext][self.sl, self.sl] > 0.5
+        if self.target_mode == "pm1day" and self._i_vnext2 is not None:
+            obs2 = block[self._i_vnext2][self.sl, self.sl] > 0.5
+            observed = obs1 & obs2
+        else:
+            observed = obs1
+
+        positive = y[0] > 0.5
+        return (observed | positive).astype(np.float32)[None, ...]
+
     def __getitem__(self, i):
         j = self.indices[i]
         block = np.asarray(self.array[j], dtype=np.float32)
@@ -191,6 +231,8 @@ class SpreadDataset(Dataset):
             v = (block[self._i_valid][self.sl, self.sl] > 0.5).astype(np.float32)[None, ...]
         else:
             v = np.ones_like(y)
+
+        v = v * self._target_valid(block, y)
 
         if self.augment:
             if np.random.rand() < 0.5:                      # horizontal
@@ -224,12 +266,21 @@ class SpreadDataset(Dataset):
         return np.clip(np.nan_to_num(y), 0.0, 1.0)
 
     def valid_mask(self, i):
-        """Observed-pixel mask, cropped. / Gözlenen piksel maskesi."""
+        """Scoring mask, cropped. / Puanlama maskesi (kırpılmış).
+
+        Identical to the mask used in the loss, so baselines and the model are
+        always scored on exactly the same pixels.
+        Kayıpta kullanılan maskeyle aynıdır; temel çizgiler ve model tam olarak
+        aynı piksellerde puanlanır.
+        """
         j = self.indices[i]
+        block = np.asarray(self.array[j], dtype=np.float32)
         if self._i_valid is None:
-            return np.ones((self.crop, self.crop), dtype=np.float32)
-        return (np.asarray(self.array[j, self._i_valid, self.sl, self.sl]) > 0.5
-                ).astype(np.float32)
+            v = np.ones((self.crop, self.crop), dtype=np.float32)
+        else:
+            v = (block[self._i_valid][self.sl, self.sl] > 0.5).astype(np.float32)
+        y = self.target_mask(i)[None, ...]
+        return v * self._target_valid(block, y)[0]
 
     def wind_uv(self, i):
         """Mean (u, v) wind for a patch, raw units. / Yama ortalaması rüzgâr."""

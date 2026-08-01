@@ -95,6 +95,18 @@ class GEEConfig:
         'fire_prev2', 'fire_prev1', 'fire',
     ]
 
+    # v4 — 21 girdi bandı / 21 input bands
+    # v3 + days_since_rain (ince yakıt kuruluğu) + burn_age (tükenmiş yakıt)
+    INPUT_BANDS_V4 = [
+        'ndvi', 'lst', 'air_temp', 'humidity', 'vpd',
+        'wind_speed', 'wind_u', 'wind_v',
+        'precip', 'precip_7d', 'precip_30d', 'days_since_rain',
+        'soil_moisture',
+        'elevation', 'slope', 'aspect', 'landcover',
+        'burn_age',
+        'fire_prev2', 'fire_prev1', 'fire',
+    ]
+
     # Hedef + yardımcı bantlar (v2 ve v3'te ortak) / target + auxiliary
     TARGET_BAND = 'fire_next'      # t+1 yangın maskesi
     TARGET2_BAND = 'fire_next2'    # t+2 yangın maskesi (+-1 gün hedefi için)
@@ -103,6 +115,14 @@ class GEEConfig:
 
     # v1 arşivinde fire_next2 ve valid YOKTUR.
     AUX_BANDS_V1 = [TARGET_BAND]
+
+    # v4: hedefin GERÇEKTEN gözlenip gözlenmediği. MODIS FireMask zaten gözlem
+    # kalitesini kodluyor (4=bulut, 0/1/2=işlenmedi, 6=bilinmiyor); v2/v3
+    # `fm.gte(7).unmask(0)` yaptığı için bulutlu piksel "yangın yok" oluyordu.
+    # v4: whether the TARGET was genuinely observed, not cloud/no-data.
+    VALID_NEXT_BAND = 'valid_next'
+    VALID_NEXT2_BAND = 'valid_next2'
+    AUX_BANDS_V4 = AUX_BANDS + [VALID_NEXT_BAND, VALID_NEXT2_BAND]
 
     # Aktif şema / active schema
     VERSION = 'v2'
@@ -114,8 +134,12 @@ class GEEConfig:
         """(input, aux, all) for a schema version. / Sürüme göre bant listeleri."""
         inp = {'v1': cls.INPUT_BANDS_V2,
                'v2': cls.INPUT_BANDS_V2,
-               'v3': cls.INPUT_BANDS_V3}[version]
-        aux = cls.AUX_BANDS_V1 if version == 'v1' else cls.AUX_BANDS
+               'v3': cls.INPUT_BANDS_V3,
+               'v4': cls.INPUT_BANDS_V4}[version]
+        aux = {'v1': cls.AUX_BANDS_V1,
+               'v2': cls.AUX_BANDS,
+               'v3': cls.AUX_BANDS,
+               'v4': cls.AUX_BANDS_V4}[version]
         return list(inp), list(aux), list(inp) + list(aux)
 
     # ---- BÜYÜME SINIFI EŞİKLERİ (grow / stable / extinguish) ----
@@ -131,6 +155,7 @@ class GEEConfig:
     # Each schema version writes to its OWN Drive folder.
     DRIVE_FOLDER = 'GEE_FireSpread_v2'
     DRIVE_FOLDER_V3 = 'GEE_FireSpread_v3'
+    DRIVE_FOLDER_V4 = 'GEE_FireSpread_v4'
     PATHS = {'data_dir': '../data/spread', 'outputs_dir': '../outputs', 'models_dir': '../models'}
 
     @classmethod
@@ -149,8 +174,8 @@ class GEEConfig:
         print(f'  Bolge    : {cls.REGION_NAME} ({cls.CRS} @ {cls.SCALE} m)')
         print(f'  Patch    : {cls.PATCH_SIZE}x{cls.PATCH_SIZE}')
         print(f'  Surum    : {cls.VERSION}')
-        print(f'  Kanallar : v2 {len(cls.INPUT_BANDS_V2)} girdi | '
-              f'v3 {len(cls.INPUT_BANDS_V3)} girdi')
+        print(f'  Kanallar : v2 {len(cls.INPUT_BANDS_V2)} | '
+              f'v3 {len(cls.INPUT_BANDS_V3)} | v4 {len(cls.INPUT_BANDS_V4)} girdi')
         print(f'  Yardimci : {cls.AUX_BANDS}')
         print(f'  Siniflar : {cls.GROWTH_CLASSES}')
 

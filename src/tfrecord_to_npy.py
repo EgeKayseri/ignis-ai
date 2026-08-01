@@ -75,6 +75,35 @@ _N_PIX = PATCH_SIZE * PATCH_SIZE
 
 
 # ======================================================================
+# Schema detection
+# ======================================================================
+def detect_schema(feature_keys):
+    """Which schema version a record belongs to, from its FEATURE NAMES.
+
+    Bir kaydın hangi şema sürümüne ait olduğunu ALAN ADLARINDAN belirle.
+
+    The band contract is positional — the loader rebuilds the channel axis from
+    band ORDER alone — so a record from the wrong schema is silently misread
+    rather than rejected. But the TFRecord itself stores each band under its own
+    NAME, and those names are unambiguous. Checking them turns "never mix
+    versions in one directory" from a documented rule into an enforced one.
+
+    Bant sözleşmesi konumsaldır; yanlış şemadan bir kayıt reddedilmez, SESSİZCE
+    yanlış yorumlanır. Ama TFRecord her bandı kendi ADIYLA saklar. Adları
+    kontrol etmek, "sürümleri karıştırma" kuralını belgeden zorunluluğa çevirir.
+    """
+    keys = set(feature_keys)
+    best = None
+    for ver in ("v4", "v3", "v2", "v1"):
+        _, _, bands = spread_bands(ver)
+        if set(bands).issubset(keys):
+            # Prefer the most specific schema whose bands are all present.
+            if best is None or len(bands) > best[1]:
+                best = (ver, len(bands))
+    return best[0] if best else None
+
+
+# ======================================================================
 # CRC32C (Castagnoli) — TFRecord integrity
 # ======================================================================
 _CRC_POLY = 0x82F63B78
@@ -302,6 +331,28 @@ def convert(version: str = None, force: bool = False, verify: bool = False,
                 print(f"  !! {fpath.name}: {exc}")
                 continue
 
+            # Verify this shard really is the schema we were asked for. A mixed
+            # directory is the one failure mode the positional band contract
+            # cannot survive, so refuse rather than produce corrupt training data.
+            # Karışık bir dizin, konumsal bant sözleşmesinin atlatamayacağı tek
+            # hata modudur; bozuk eğitim verisi üretmek yerine reddet.
+            if records:
+                found = detect_schema(parse_example(records[0]).keys())
+                if found is None:
+                    raise RuntimeError(
+                        f"{fpath.name}: no known schema matches this record.\n"
+                        f"Bu kayıt bilinen hiçbir şemayla eşleşmiyor.")
+                if found != version:
+                    raise RuntimeError(
+                        f"SCHEMA MISMATCH / ŞEMA UYUŞMAZLIĞI\n"
+                        f"  {fpath.name} is a {found} record, but --version {version} "
+                        f"was requested.\n"
+                        f"  {src_dir} contains mixed schemas, or the wrong "
+                        f"--version was given.\n"
+                        f"  Each schema needs its OWN directory: v2 -> data/spread/, "
+                        f"v3 -> data/spread_v3/, v4 -> data/spread_v4/.\n"
+                        f"  Her şema KENDİ dizininde olmalıdır.")
+
             for raw in records:
                 feat = parse_example(raw)
                 if any(b not in feat for b in all_bands):
@@ -448,7 +499,7 @@ def load_cache(version: str = None):
 
 def main():
     ap = argparse.ArgumentParser(description="TFRecord -> memmap .npy cache")
-    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3"],
+    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3", "v4"],
                     help="dataset schema version / veri seti şema sürümü")
     ap.add_argument("--verify", action="store_true",
                     help="check CRCs and print an integrity report / bütünlük raporu")

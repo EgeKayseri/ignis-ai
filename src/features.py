@@ -3,8 +3,8 @@ Feature engineering — raw bands -> network input
 Öznitelik mühendisliği — ham bantlar -> ağ girdisi
 =================================================
 
-Turns the 14 (v2) or 19 (v3) raw channels into the tensor the U-Net actually
-consumes. Four transformations, each fixing a specific defect in the raw data.
+Turns the raw channels (14 in v2, 19 in v3, 21 in v4) into the tensor the U-Net
+actually consumes. Four transformations, each fixing a defect in the raw data.
 
 Ham kanalları U-Net'in gerçekten tükettiği tensöre çevirir.
 
@@ -64,11 +64,16 @@ CONTINUOUS = (
     "ndvi", "lst", "air_temp", "humidity", "vpd",
     "wind_speed", "wind_u", "wind_v",
     "soil_moisture", "elevation", "slope",
+    # v4: recency channels, already in days and bounded by their caps, but
+    # z-scored like any other continuous band so no channel dominates the
+    # first convolution. / v4: gün cinsinden geçmiş kanalları.
+    "days_since_rain", "burn_age",
 )
 # Bands that get log1p before z-scoring (right-skewed, mostly zero).
 LOG_SCALED = ("precip", "precip_7d", "precip_30d")
 # Bands already in [0, 1] that are passed through untouched.
-BINARY = ("fire", "fire_prev1", "fire_prev2", "valid")
+BINARY = ("fire", "fire_prev1", "fire_prev2", "valid",
+          "valid_next", "valid_next2")
 # Special encodings.
 CIRCULAR = ("aspect",)
 CATEGORICAL = ("landcover",)

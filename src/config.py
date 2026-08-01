@@ -308,6 +308,18 @@ SPREAD_INPUT_BANDS_V3 = [
     "fire",
 ]
 
+# ---- v4 şeması: 21 girdi bandı (v3 + yakıt/kuruluk geçmişi) ----
+SPREAD_INPUT_BANDS_V4 = [
+    "ndvi", "lst", "air_temp", "humidity", "vpd",
+    "wind_speed", "wind_u", "wind_v",
+    "precip", "precip_7d", "precip_30d",
+    "days_since_rain",   # son >1 mm yağıştan bu yana gün   days since measurable rain
+    "soil_moisture",
+    "elevation", "slope", "aspect", "landcover",
+    "burn_age",          # son yanıştan bu yana gün (0-14)  days since last burn
+    "fire_prev2", "fire_prev1", "fire",
+]
+
 # ---- Hedef ve yardımcı bantlar (v2 ve v3'te aynı) ----
 SPREAD_TARGET_BAND = "fire_next"    # t+1 yangın maskesi   fire mask, day t+1
 SPREAD_TARGET2_BAND = "fire_next2"  # t+2 yangın maskesi   fire mask, day t+2
@@ -317,6 +329,17 @@ SPREAD_AUX_BANDS = [SPREAD_TARGET_BAND, SPREAD_TARGET2_BAND, SPREAD_VALID_BAND]
 # v1 arşivinde fire_next2 ve valid YOKTUR (yalnızca fire_next).
 SPREAD_AUX_BANDS_V1 = [SPREAD_TARGET_BAND]
 
+# ---- v4: hedefin GERÇEKTEN gözlenip gözlenmediğini söyleyen bantlar ----
+# MODIS FireMask gözlem kalitesini zaten kodluyor (0,1,2 işlenmedi; 4 bulut;
+# 6 bilinmiyor; 3,5 gözlenmiş kara/su; 7,8,9 yangın). v2/v3 `fm.gte(7).unmask(0)`
+# yaptığı için BULUTLU bir piksel "yangın yok" olarak etiketleniyordu — yamaların
+# %58.9'unda t+1 hedefinin boş çıkmasının sebebi buydu (3. kök neden).
+# v4 bu bilgiyi taşır; eğitimde gözlenmemiş hedef pikselleri kayba girmez.
+SPREAD_VALID_NEXT_BAND = "valid_next"
+SPREAD_VALID_NEXT2_BAND = "valid_next2"
+SPREAD_AUX_BANDS_V4 = SPREAD_AUX_BANDS + [SPREAD_VALID_NEXT_BAND,
+                                          SPREAD_VALID_NEXT2_BAND]
+
 # ---- Aktif şema ----
 # 'v2' -> data/spread/ (14 girdi) ; 'v3' -> data/spread_v3/ (19 girdi)
 SPREAD_VERSION = "v2"
@@ -325,14 +348,17 @@ _BANDS_BY_VERSION = {
     "v1": (SPREAD_INPUT_BANDS_V2, SPREAD_AUX_BANDS_V1),
     "v2": (SPREAD_INPUT_BANDS_V2, SPREAD_AUX_BANDS),
     "v3": (SPREAD_INPUT_BANDS_V3, SPREAD_AUX_BANDS),
+    "v4": (SPREAD_INPUT_BANDS_V4, SPREAD_AUX_BANDS_V4),
 }
 
 DATA_SPREAD_V3_DIR = DATA_DIR / "spread_v3"
+DATA_SPREAD_V4_DIR = DATA_DIR / "spread_v4"
 DATA_SPREAD_V1_DIR = DATA_DIR / "spread_v1_legacy"
 _DIR_BY_VERSION = {
     "v1": DATA_SPREAD_V1_DIR,
     "v2": DATA_SPREAD_DIR,
     "v3": DATA_SPREAD_V3_DIR,
+    "v4": DATA_SPREAD_V4_DIR,
 }
 
 
