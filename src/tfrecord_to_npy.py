@@ -94,7 +94,7 @@ def detect_schema(feature_keys):
     """
     keys = set(feature_keys)
     best = None
-    for ver in ("v4", "v3", "v2", "v1"):
+    for ver in ("v5", "v4", "v3", "v2", "v1"):
         _, _, bands = spread_bands(ver)
         if set(bands).issubset(keys):
             # Prefer the most specific schema whose bands are all present.
@@ -350,7 +350,7 @@ def convert(version: str = None, force: bool = False, verify: bool = False,
                         f"  {src_dir} contains mixed schemas, or the wrong "
                         f"--version was given.\n"
                         f"  Each schema needs its OWN directory: v2 -> data/spread/, "
-                        f"v3 -> data/spread_v3/, v4 -> data/spread_v4/.\n"
+                        f"v3 -> data/spread_v3/, v5 -> data/spread_v5/.\n"
                         f"  Her şema KENDİ dizininde olmalıdır.")
 
             for raw in records:
@@ -499,7 +499,7 @@ def load_cache(version: str = None):
 
 def main():
     ap = argparse.ArgumentParser(description="TFRecord -> memmap .npy cache")
-    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3", "v4"],
+    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3", "v4", "v5"],
                     help="dataset schema version / veri seti şema sürümü")
     ap.add_argument("--verify", action="store_true",
                     help="check CRCs and print an integrity report / bütünlük raporu")

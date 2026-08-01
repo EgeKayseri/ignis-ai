@@ -308,7 +308,11 @@ SPREAD_INPUT_BANDS_V3 = [
     "fire",
 ]
 
-# ---- v4 şeması: 21 girdi bandı (v3 + yakıt/kuruluk geçmişi) ----
+# ---- v4/v5 şeması: 21 girdi bandı (v3 + yakıt/kuruluk geçmişi) ----
+# v5, v4 ile AYNI bant şemasını kullanır. v4 notebook'u sunucu tarafında
+# çöktüğü için hiç veri üretmedi; v5 onun düzeltilmiş hâlidir.
+# v5 uses the SAME band schema as v4. The v4 notebook never produced any data
+# because it crashed server-side; v5 is its corrected replacement.
 SPREAD_INPUT_BANDS_V4 = [
     "ndvi", "lst", "air_temp", "humidity", "vpd",
     "wind_speed", "wind_u", "wind_v",
@@ -342,23 +346,27 @@ SPREAD_AUX_BANDS_V4 = SPREAD_AUX_BANDS + [SPREAD_VALID_NEXT_BAND,
 
 # ---- Aktif şema ----
 # 'v2' -> data/spread/ (14 girdi) ; 'v3' -> data/spread_v3/ (19 girdi)
-SPREAD_VERSION = "v2"
+# 'v5' -> data/spread_v5/ (21 girdi) — güncel şema
+SPREAD_VERSION = "v5"
 
 _BANDS_BY_VERSION = {
     "v1": (SPREAD_INPUT_BANDS_V2, SPREAD_AUX_BANDS_V1),
     "v2": (SPREAD_INPUT_BANDS_V2, SPREAD_AUX_BANDS),
     "v3": (SPREAD_INPUT_BANDS_V3, SPREAD_AUX_BANDS),
     "v4": (SPREAD_INPUT_BANDS_V4, SPREAD_AUX_BANDS_V4),
+    "v5": (SPREAD_INPUT_BANDS_V4, SPREAD_AUX_BANDS_V4),   # same schema as v4
 }
 
 DATA_SPREAD_V3_DIR = DATA_DIR / "spread_v3"
 DATA_SPREAD_V4_DIR = DATA_DIR / "spread_v4"
+DATA_SPREAD_V5_DIR = DATA_DIR / "spread_v5"
 DATA_SPREAD_V1_DIR = DATA_DIR / "spread_v1_legacy"
 _DIR_BY_VERSION = {
     "v1": DATA_SPREAD_V1_DIR,
     "v2": DATA_SPREAD_DIR,
     "v3": DATA_SPREAD_V3_DIR,
     "v4": DATA_SPREAD_V4_DIR,
+    "v5": DATA_SPREAD_V5_DIR,
 }
 
 

@@ -125,7 +125,7 @@ class GEEConfig:
     AUX_BANDS_V4 = AUX_BANDS + [VALID_NEXT_BAND, VALID_NEXT2_BAND]
 
     # Aktif şema / active schema
-    VERSION = 'v2'
+    VERSION = 'v5'
     INPUT_BANDS = INPUT_BANDS_V2          # geriye dönük uyumluluk
     ALL_BANDS = INPUT_BANDS_V2 + AUX_BANDS
 
@@ -135,11 +135,13 @@ class GEEConfig:
         inp = {'v1': cls.INPUT_BANDS_V2,
                'v2': cls.INPUT_BANDS_V2,
                'v3': cls.INPUT_BANDS_V3,
-               'v4': cls.INPUT_BANDS_V4}[version]
+               'v4': cls.INPUT_BANDS_V4,
+               'v5': cls.INPUT_BANDS_V4}[version]
         aux = {'v1': cls.AUX_BANDS_V1,
                'v2': cls.AUX_BANDS,
                'v3': cls.AUX_BANDS,
-               'v4': cls.AUX_BANDS_V4}[version]
+               'v4': cls.AUX_BANDS_V4,
+               'v5': cls.AUX_BANDS_V4}[version]
         return list(inp), list(aux), list(inp) + list(aux)
 
     # ---- BÜYÜME SINIFI EŞİKLERİ (grow / stable / extinguish) ----
@@ -156,6 +158,7 @@ class GEEConfig:
     DRIVE_FOLDER = 'GEE_FireSpread_v2'
     DRIVE_FOLDER_V3 = 'GEE_FireSpread_v3'
     DRIVE_FOLDER_V4 = 'GEE_FireSpread_v4'
+    DRIVE_FOLDER_V5 = 'GEE_FireSpread_v5'
     PATHS = {'data_dir': '../data/spread', 'outputs_dir': '../outputs', 'models_dir': '../models'}
 
     @classmethod

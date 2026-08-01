@@ -137,7 +137,7 @@ evaluation time.
 
 ## 4. Dataset versions and band contracts / Veri seti sürümleri ve bant sözleşmeleri
 
-Four schemas exist. **They must never be mixed in one directory** — the loader
+Four schemas exist (v1, v2, v3, v5; v4 was withdrawn — see below). **They must never be mixed in one directory** — the loader
 reconstructs the channel axis from band order alone, so a record from the wrong
 schema is silently misinterpreted rather than rejected.
 
@@ -149,7 +149,7 @@ aborts on a mixed directory, so this rule is enforced rather than merely documen
 | **v1** | `data/spread_v1_legacy/` | 14 | 2019 – 26 Jul 2021 | 360 | Original archive. All measured numbers below come from this. Superseded. |
 | **v2** | `data/spread/` | 14 | 2019 – 2026 | ~1131 | Adds `fire_next2` and `valid`. |
 | **v3** | `data/spread_v3/` | 19 | 2019 – 2026 | ~1131 | v2 plus temporal context and fire weather. |
-| **v4** | `data/spread_v4/` | 21 | 2019 – 2026 | ~1131 | v3 plus fuel history and, critically, `valid_next`. |
+| **v5** | `data/spread_v5/` | 21 | 2019 – 2026 | ~1131 | v3 plus fuel history and, critically, `valid_next`. Current. |
 
 Band order is **contractual** across three files — `noteboks/colab_notebook*.ipynb`,
 `src/gee_config.py` and `src/config.py`. Change it in all three or in none.
@@ -172,7 +172,7 @@ fire_prev2  fire_prev1  fire
 fire_next  fire_next2  valid
 ```
 
-**v4 — 21 input bands + 5 target/auxiliary:**
+**v5 — 21 input bands + 5 target/auxiliary:**
 
 ```
 ndvi  lst  air_temp  humidity  vpd
@@ -185,7 +185,7 @@ fire_prev2  fire_prev1  fire
 fire_next  fire_next2  valid  valid_next  valid_next2
 ```
 
-v4 adds two inputs and two auxiliary bands over v3. `days_since_rain` tracks
+v5 adds two inputs and two auxiliary bands over v3. `days_since_rain` tracks
 fine-fuel dryness, which a 24-hour rainfall total cannot (that band is exactly
 zero on 91.4 % of pixels). `burn_age` is days since the pixel last burned: fire
 does not spread into ground whose fuel it has already consumed, and without it
@@ -230,14 +230,14 @@ v2 and v3 did `fm.gte(7).unmask(0)`, which collapses "observed, not burning",
 "hidden by cloud" and "never processed" into the single value 0. A pixel behind a
 cloud was labelled *no fire*, and the network was trained to reproduce that.
 
-v4 exports `valid_next` and `valid_next2`, so the loss can mask target pixels the
+v5 exports `valid_next` and `valid_next2`, so the loss can mask target pixels the
 satellite never actually looked at. `dataset.py` applies an asymmetric rule,
 because the evidence is asymmetric: a **detection** is trustworthy on its own,
 but an **absence** is only evidence if we looked. With
 `target = max(fire_next, fire_next2)`, a zero counts only when both days were
 observed.
 
-`valid` also tightened in v4: it now requires that MODIS observed the pixel
+`valid` also tightened in v5: it now requires that MODIS observed the pixel
 *today*, not merely that the environmental bands were unmasked.
 
 ## 5. Target definition / Hedef tanımı
@@ -490,7 +490,7 @@ F1 **on validation**, and writes an HTML report, scorecard and folium map to
 noteboks/
   colab_notebook.ipynb        GEE export, v2 schema (14 input bands)
   colab_notebook_v3.ipynb     GEE export, v3 schema (19 input bands)
-  colab_notebook_v4.ipynb     GEE export, v4 schema (21 input bands) — current
+  colab_notebook_v5.ipynb     GEE export, v5 schema (21 input bands) — current
 
 src/
   config.py                   all constants; the SPREAD_* section is the live one
@@ -509,7 +509,7 @@ src/
 data/
   spread/                     v2 archive (git-ignored)
   spread_v3/                  v3 archive (git-ignored)
-  spread_v4/                  v4 archive (git-ignored)
+  spread_v5/                  v5 archive (git-ignored)
   spread_v1_legacy/           v1 archive, superseded (git-ignored)
 
 models/
