@@ -130,8 +130,11 @@ r > 1.25 -> growing ; 0.75 <= r <= 1.25 -> stable ; r < 0.75 -> extinguishing
 - **The repo lives on `/mnt/windows`, an NTFS fuseblk mount.** Per-epoch I/O against it
   is slow. Convert TFRecords once into a memory-mapped cache under `~/ignis-cache/`
   (local ext4) and train from there.
-- `rm` is aliased to a sudo-requiring safe wrapper in this user's zsh. Use
-  `/usr/bin/rm` for scripted deletion.
+- **`rm` AND `cp` are aliased to sudo-requiring safe wrappers** in this user's zsh.
+  Use `/usr/bin/rm` and `/usr/bin/cp` for anything scripted. A bare `cp` fails on
+  the sudo prompt *after* partially running, and leaves a stray directory named
+  after its destination argument in the cwd — the `0/` directory once found at the
+  repo root came from exactly that.
 
 ## Conventions
 
