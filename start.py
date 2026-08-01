@@ -6,8 +6,10 @@
 `python start.py` çalıştırıldığında pipeline'ı DOĞRUDAN başlatır:
   0. Ortam kontrolü (gerekli paketler)
   1. Veri kontrolü (data/spread/*.tfrecord.gz)
-  2. U-Net eğitimi  (src/train_spread.py)
-  3. Özet
+  2. TFRecord -> memmap önbelleği (src/tfrecord_to_npy.py)
+  3. U-Net eğitimi  (src/train.py)
+  4. Değerlendirme — YALNIZCA test bölmesi (src/evaluate.py)
+  5. Özet
 
 Veri henüz yoksa (Colab'dan indirilmediyse) ne yapılacağını net şekilde söyler
 ve hata vermeden durur. Tüm proje detayı için: README.md
@@ -18,14 +20,10 @@ import sys
 import time
 from pathlib import Path
 
-# TensorFlow uyarılarını gizle
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-os.environ.setdefault("TF_FORCE_GPU_ALLOW_GROWTH", "true")
-
 BASE_DIR = Path(__file__).parent
 SRC_DIR = BASE_DIR / "src"
 SPREAD_DIR = BASE_DIR / "data" / "spread"
-MODEL_FILE = BASE_DIR / "models" / "spread_unet.keras"
+MODEL_FILE = BASE_DIR / "models" / "spread_unet.pt"
 
 
 class C:
@@ -60,7 +58,7 @@ def info(m): print(f"{C.CYAN}ℹ️  {m}{C.ENDC}")
 def check_environment():
     section("ORTAM KONTROLÜ", 0)
     required = {
-        "tensorflow": "TensorFlow/Keras",
+        "torch": "PyTorch (ROCm)",
         "numpy": "NumPy",
         "matplotlib": "Matplotlib",
     }
@@ -74,7 +72,8 @@ def check_environment():
             missing.append(pkg)
     if missing:
         warn(f"Eksik paketler: {', '.join(missing)}")
-        info("Kurulum:  pip install -r requirements.txt")
+        info("Kurulum:  sudo pacman -S rocm-hip-sdk rocminfo python-pytorch-rocm \\")
+        info("                        python-scikit-learn python-matplotlib python-scipy")
         sys.exit(1)
     ok("Tüm paketler hazır!")
 
@@ -94,31 +93,50 @@ def check_data():
     info("Yangın büyüme verisini üretmek için:")
     print(f"   {C.YELLOW}1){C.ENDC} noteboks/colab_notebook.ipynb dosyasını Google Colab'da aç")
     print(f"   {C.YELLOW}2){C.ENDC} Hücreleri çalıştır (GEE proje ID + kimlik doğrulama)")
-    print(f"   {C.YELLOW}3){C.ENDC} Drive > GEE_FireSpread/ klasöründeki *.tfrecord.gz dosyalarını indir")
+    print(f"   {C.YELLOW}3){C.ENDC} Drive > GEE_FireSpread_v2/ klasöründeki *.tfrecord.gz dosyalarını indir")
     print(f"   {C.YELLOW}4){C.ENDC} Bunları data/spread/ içine koy ve tekrar: {C.BOLD}python start.py{C.ENDC}")
     print()
     info("Ayrıntılı anlatım: README.md → 'Veri Üretimi' bölümü")
     return False
 
 
-def run_training():
-    section("U-NET EĞİTİMİ", 2)
+def run_cache():
+    section("TFRECORD -> MEMMAP ÖNBELLEĞİ", 2)
     sys.path.insert(0, str(SRC_DIR))
-    info("src/train_spread.py çalıştırılıyor...")
+    info("src/tfrecord_to_npy.py çalıştırılıyor...")
     t0 = time.time()
-    import train_spread
-    train_spread.main()
+    import tfrecord_to_npy
+    tfrecord_to_npy.convert(verify=True)
+    ok(f"Önbellek hazır ({time.time() - t0:.1f}s)")
+
+
+def run_training():
+    section("U-NET EĞİTİMİ", 3)
+    sys.path.insert(0, str(SRC_DIR))
+    info("src/train.py çalıştırılıyor...")
+    t0 = time.time()
+    import train
+    train.train()
     ok(f"Eğitim tamamlandı ({time.time() - t0:.1f}s)")
 
 
 def run_evaluation():
-    section("DEĞERLENDİRME (SONUÇLAR)", 3)
+    section("DEĞERLENDİRME (SONUÇLAR)", 4)
     sys.path.insert(0, str(SRC_DIR))
-    import evaluate_spread
-    info("Model doğrulama verisiyle değerlendiriliyor...")
-    metrics = evaluate_spread.evaluate()
-    ok(f"NET DOĞRULUK %{metrics['growth_accuracy']*100:.1f}  |  "
-       f"AUC-PR={metrics['ap']:.3f}  IoU={metrics['iou']:.3f}")
+    import evaluate
+    info("Model AYRILMIŞ TEST bölmesiyle değerlendiriliyor...")
+    metrics, baselines = evaluate.evaluate()
+    ok(f"IoU={metrics['iou']:.4f}  F1={metrics['f1']:.4f}  "
+       f"AUC-PR={metrics['ap']:.4f}")
+    # Bir skor, ancak asmasi gereken temel cizgiyle birlikte anlamlidir.
+    # A score is only meaningful next to the bar it has to clear.
+    best = max(baselines.items(), key=lambda kv: kv[1]["iou"])
+    if metrics["beats_baseline"]:
+        ok(f"Model en iyi temel çizgiyi GEÇİYOR "
+           f"({best[0]}, IoU={best[1]['iou']:.4f})")
+    else:
+        err(f"Model temel çizgiyi GEÇEMİYOR: "
+            f"{best[0]} IoU={best[1]['iou']:.4f} > model {metrics['iou']:.4f}")
 
 
 def summary():
@@ -145,6 +163,7 @@ def main():
         if not check_data():
             # Veri yok: kullanıcıyı yönlendirdik, hata değil.
             sys.exit(0)
+        run_cache()
         run_training()
         run_evaluation()
         summary()

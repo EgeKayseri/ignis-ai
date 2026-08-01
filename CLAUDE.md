@@ -152,11 +152,19 @@ noteboks/colab_notebook.ipynb      GEE export, v2 schema (14 input bands)
 noteboks/colab_notebook_v3.ipynb   GEE export, v3 schema (19 input bands)
 src/config.py                      all constants; SPREAD_* section is the live one
 src/gee_config.py                  GEE collections and band contract
-src/spread_dataset.py              LEGACY TensorFlow loader — being replaced
-src/spread_model.py                LEGACY TensorFlow U-Net — being replaced
-src/train_spread.py                LEGACY TensorFlow training — being replaced
-src/evaluate_spread.py             evaluation + HTML/scorecard/folium reporting;
-                                   the reporting half is worth porting, not rewriting
+src/device.py                      ROCm device selection, bfloat16 autocast
+src/tfrecord_to_npy.py             TFRecord -> ~/ignis-cache memmap (pure-Python
+                                   protobuf reader, no TensorFlow)
+src/features.py                    raw bands -> network input; z-score (train split
+                                   only), aspect sin/cos, landcover one-hot, log1p
+src/dataset.py                     memmap Dataset, centre crop, year split,
+                                   direction-aware augmentation
+src/model.py                       U-Net, architecture preserved from TF layer-for-layer
+src/losses.py                      masked BCE+SoftDice (default), FocalTversky
+src/train.py                       AdamW, cosine warm restarts, bf16, best val AUC-PR
+src/baselines.py                   persistence, dilated, wind-directed growth
+src/evaluate.py                    TEST SPLIT ONLY, threshold calibrated on val,
+                                   HTML/scorecard/folium ported from evaluate_spread.py
 docs/GUIDE_EN.md                   36 k-word educational guide, English
 docs/REHBER_TR.md                  same guide, Turkish
 paper/                             manuscript, IAC guidelines, admin documents
@@ -166,14 +174,25 @@ The eight static-risk modules (`preprocess`, `train`, `predict`, `test_accuracy`
 `map_visualization`, `main`, `examples`, `gee_data_processor`) and their model weights
 were deleted — they belonged to an abandoned susceptibility model.
 
+The four legacy TensorFlow modules (`spread_dataset.py`, `spread_model.py`,
+`train_spread.py`, `evaluate_spread.py`) were deleted once the PyTorch port landed.
+The reporting half of `evaluate_spread.py` was ported into `evaluate.py`, not rewritten.
+
 ## Commands
 
 ```bash
+python src/device.py                     # confirm the GPU is visible to PyTorch
 python src/tfrecord_to_npy.py --verify   # TFRecord -> memmap cache + integrity report
+python src/dataset.py                    # patch counts and prevalence per split
+python src/model.py                      # architecture + parameter breakdown
 python src/train.py                      # train the U-Net
 python src/baselines.py                  # persistence / dilated / wind-directed
-python src/evaluate.py                   # held-out split only, calibrated threshold
+python src/evaluate.py                   # TEST split only, calibrated threshold
+python start.py                          # cache -> train -> evaluate, end to end
 ```
+
+`SPREAD_VERSION` in `src/config.py` selects the schema (v2 by default); every
+script also takes `--version`.
 
 ## graphify
 

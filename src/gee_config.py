@@ -66,26 +66,71 @@ class GEEConfig:
                        'description': 'Arazi örtüsü / yakıt tipi (yıllık)'},
     }
 
-    # ---- KANAL SIRASI (export selectors ile birebir aynı olmalı) ----
-    INPUT_BANDS = [
+    # ---- KANAL SIRASI / BAND CONTRACT ----
+    # Bu sıra SÖZLEŞMEDİR ve üç yerde birebir aynı olmalıdır:
+    #   noteboks/colab_notebook*.ipynb, src/gee_config.py, src/config.py
+    # Yükleyici kanal eksenini yalnızca bu sıradan kurar; kısa bir kayıt
+    # hata vermez, SESSİZCE yanlış yorumlanır.
+    # This order is contractual across the notebooks, this file and config.py.
+    # A short record is silently misread rather than rejected.
+
+    # v2 — 14 girdi bandı / 14 input bands
+    INPUT_BANDS_V2 = [
         'ndvi', 'lst', 'air_temp', 'humidity',
         'wind_speed', 'wind_u', 'wind_v',
         'precip', 'soil_moisture',
         'elevation', 'slope', 'aspect',
         'landcover', 'fire',
     ]
-    TARGET_BAND = 'fire_next'
-    ALL_BANDS = INPUT_BANDS + [TARGET_BAND]
+
+    # v3 — 19 girdi bandı / 19 input bands
+    # v2 + vpd, precip_7d, precip_30d, fire_prev1, fire_prev2
+    INPUT_BANDS_V3 = [
+        'ndvi', 'lst', 'air_temp', 'humidity',
+        'vpd',
+        'wind_speed', 'wind_u', 'wind_v',
+        'precip', 'precip_7d', 'precip_30d',
+        'soil_moisture',
+        'elevation', 'slope', 'aspect', 'landcover',
+        'fire_prev2', 'fire_prev1', 'fire',
+    ]
+
+    # Hedef + yardımcı bantlar (v2 ve v3'te ortak) / target + auxiliary
+    TARGET_BAND = 'fire_next'      # t+1 yangın maskesi
+    TARGET2_BAND = 'fire_next2'    # t+2 yangın maskesi (+-1 gün hedefi için)
+    VALID_BAND = 'valid'           # 1 = tüm girdiler gerçekten gözlendi
+    AUX_BANDS = [TARGET_BAND, TARGET2_BAND, VALID_BAND]
+
+    # v1 arşivinde fire_next2 ve valid YOKTUR.
+    AUX_BANDS_V1 = [TARGET_BAND]
+
+    # Aktif şema / active schema
+    VERSION = 'v2'
+    INPUT_BANDS = INPUT_BANDS_V2          # geriye dönük uyumluluk
+    ALL_BANDS = INPUT_BANDS_V2 + AUX_BANDS
+
+    @classmethod
+    def bands(cls, version='v2'):
+        """(input, aux, all) for a schema version. / Sürüme göre bant listeleri."""
+        inp = {'v1': cls.INPUT_BANDS_V2,
+               'v2': cls.INPUT_BANDS_V2,
+               'v3': cls.INPUT_BANDS_V3}[version]
+        aux = cls.AUX_BANDS_V1 if version == 'v1' else cls.AUX_BANDS
+        return list(inp), list(aux), list(inp) + list(aux)
 
     # ---- BÜYÜME SINIFI EŞİKLERİ (grow / stable / extinguish) ----
     # ratio = (yarınki yangın pikseli) / (bugünkü yangın pikseli)
     GROWTH_CLASSES = {0: 'extinguish', 1: 'stable', 2: 'grow'}
     GROW_RATIO = 1.25                 # ratio > 1.25  -> grow  (stable bandı genişletildi)
     STABLE_LOW = 0.75                 # 0.75 <= ratio <= 1.25 -> stable
-    #                                   ratio < 0.85 (0 dahil) -> extinguish
+    #                                   ratio < 0.75 (0 dahil) -> extinguish
 
     # Çıktı
-    DRIVE_FOLDER = 'GEE_FireSpread'
+    # Her şema sürümü AYRI bir Drive klasörüne yazar; devam taraması
+    # aksi hâlde v2 parçalarını v3 sanır.
+    # Each schema version writes to its OWN Drive folder.
+    DRIVE_FOLDER = 'GEE_FireSpread_v2'
+    DRIVE_FOLDER_V3 = 'GEE_FireSpread_v3'
     PATHS = {'data_dir': '../data/spread', 'outputs_dir': '../outputs', 'models_dir': '../models'}
 
     @classmethod
@@ -103,7 +148,10 @@ class GEEConfig:
         print(f'  Proje ID : {cls.PROJECT_ID}')
         print(f'  Bolge    : {cls.REGION_NAME} ({cls.CRS} @ {cls.SCALE} m)')
         print(f'  Patch    : {cls.PATCH_SIZE}x{cls.PATCH_SIZE}')
-        print(f'  Kanallar : {len(cls.INPUT_BANDS)} girdi + 1 hedef ({cls.TARGET_BAND})')
+        print(f'  Surum    : {cls.VERSION}')
+        print(f'  Kanallar : v2 {len(cls.INPUT_BANDS_V2)} girdi | '
+              f'v3 {len(cls.INPUT_BANDS_V3)} girdi')
+        print(f'  Yardimci : {cls.AUX_BANDS}')
         print(f'  Siniflar : {cls.GROWTH_CLASSES}')
 
 

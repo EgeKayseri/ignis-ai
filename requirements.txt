@@ -1,12 +1,37 @@
+# IGNIS — Python dependencies / Python bağımlılıkları
+#
+# NOTE / NOT
+# ----------
+# On Arch Linux the training stack is installed with pacman, NOT pip. The ROCm
+# build of PyTorch is a system package built against system Python 3.14 and
+# rocm-hip-sdk; a pip wheel will not find the HIP runtime.
+#
+# Arch Linux'ta eğitim yığını pip ile DEĞİL pacman ile kurulur. PyTorch'un ROCm
+# yapısı sistem paketidir; pip wheel'i HIP çalışma zamanını bulamaz.
+#
+#   sudo pacman -S rocm-hip-sdk rocminfo python-pytorch-rocm \
+#                  python-scikit-learn python-matplotlib python-scipy
+#
+# TensorFlow was REMOVED. There is no TensorFlow wheel for Python 3.14 and AMD's
+# TensorFlow-ROCm path is Docker-only. The pipeline is PyTorch + ROCm, and the
+# TFRecord archive is decoded by a pure-Python reader in src/tfrecord_to_npy.py.
+# TensorFlow KALDIRILDI; TFRecord'lar saf Python çözücüyle okunuyor.
+
+# --- Earth Engine / notebook side ---
+earthengine-api>=0.1.358
+geemap>=0.25.0
 requests>=2.31.0
-pandas>=2.0.0
+
+# --- reporting ---
+folium>=0.14.0
+
+# --- provided by pacman on Arch; pinned here for non-Arch environments ---
+# torch          -> python-pytorch-rocm
+# numpy          -> python-numpy
+# scipy          -> python-scipy
+# scikit-learn   -> python-scikit-learn
+# matplotlib     -> python-matplotlib
 numpy>=1.24.0
 scipy>=1.10.0
 scikit-learn>=1.3.0
-tensorflow>=2.12.0
 matplotlib>=3.7.0
-seaborn>=0.12.0
-folium>=0.14.0
-joblib>=1.3.0
-earthengine-api>=0.1.358
-geemap>=0.25.0
