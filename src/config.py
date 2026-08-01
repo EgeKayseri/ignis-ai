@@ -30,6 +30,7 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_PROCESSED_DIR = DATA_DIR / "processed"
+DATA_SPREAD_DIR = DATA_DIR / "spread"  # YENİ: yangın büyüme TFRecord yamaları
 
 # Model dizini
 MODELS_DIR = BASE_DIR / "models"
@@ -239,6 +240,7 @@ def ensure_directories_exist() -> None:
         DATA_DIR,
         DATA_RAW_DIR,
         DATA_PROCESSED_DIR,
+        DATA_SPREAD_DIR,
         MODELS_DIR,
         OUTPUTS_DIR,
         REPORTS_DIR,
@@ -250,10 +252,91 @@ def ensure_directories_exist() -> None:
         directory.mkdir(parents=True, exist_ok=True)
 
 
+# ============================================================
+# ============================================================
+# YANGIN BÜYÜME (RASTER / NEXT-DAY SPREAD) PIPELINE
+# ============================================================
+# NOT: Yukarıdaki FEATURES/TARGET/MODEL_CONFIG eski STATİK RİSK modeline aittir
+# (Dense NN, yangin_var 0/1). Aşağıdaki sabitler yeni RASTER YANGIN BÜYÜME
+# pipeline'ı içindir. Eski risk modülleri (preprocess/train/predict) artık
+# LEGACY'dir; yerlerini spread_dataset.py + spread_model.py + train_spread.py alır.
+# ============================================================
+
+# ---- Girdi kanalları (yamanın kanal sırası; GEE export ile aynı) ----
+SPREAD_INPUT_BANDS = [
+    "ndvi",          # bitki örtüsü indeksi
+    "lst",           # arazi yüzey sıcaklığı (°C)
+    "air_temp",      # 2m hava sıcaklığı (°C)
+    "humidity",      # bağıl nem (%)
+    "wind_speed",    # rüzgâr hızı (m/s)
+    "wind_u",        # rüzgâr doğu-batı bileşeni
+    "wind_v",        # rüzgâr kuzey-güney bileşeni
+    "precip",        # yağış (mm)
+    "soil_moisture", # toprak nemi (m³/m³)
+    "elevation",     # yükseklik (m)
+    "slope",         # eğim (derece)
+    "aspect",        # bakı (derece)
+    "landcover",     # arazi örtüsü / yakıt sınıfı
+    "fire",          # bugünün aktif yangın maskesi (0/1)
+]
+SPREAD_TARGET_BAND = "fire_next"   # ertesi günün yangın maskesi (0/1) — segmentasyon hedefi
+SPREAD_N_CHANNELS = len(SPREAD_INPUT_BANDS)
+
+# ---- Yama boyutu ----
+PATCH_RADIUS = 32
+PATCH_SIZE = 2 * PATCH_RADIUS + 1  # 65
+MODEL_PATCH = 64                   # eğitimde 64x64'e kırpılır
+
+# ---- Büyüme sınıfları (grow / stable / extinguish) ----
+# NOT: "stable" bandı genişletildi (0.75-1.25). Eski dar bant (0.85-1.15) stable'ı çok
+# nadir ve bulanık yapıyordu; bu yüzden model stable'ı zor öğreniyordu. Geniş bant daha
+# dengeli 3-sınıf problemi verir.
+GROWTH_CLASSES = {0: "extinguish", 1: "stable", 2: "grow"}
+GROWTH_GROW_RATIO = 1.25           # ratio > 1.25 -> grow
+GROWTH_STABLE_LOW = 0.75           # 0.75 <= ratio <= 1.25 -> stable, aksi -> extinguish
+
+# ---- U-Net segmentasyon modeli ----
+SPREAD_MODEL_FILE = MODELS_DIR / "spread_unet.keras"
+SPREAD_MODEL_CONFIG = {
+    "input_shape": (MODEL_PATCH, MODEL_PATCH, SPREAD_N_CHANNELS),
+    # Tam model (en yüksek doğruluk). CPU'da yavaştır; gece açık bırakarak eğitilir.
+    # Çok yavaşsa geçici olarak base_filters=16, depth=2 yapılabilir.
+    "base_filters": 32,            # U-Net taban filtre sayısı
+    "depth": 3,                    # encoder/decoder derinliği
+    "dropout": 0.2,
+    "final_activation": "sigmoid", # piksel başına yayılım olasılığı
+}
+SPREAD_OPTIMIZER = "adam"
+SPREAD_LEARNING_RATE = 1e-3
+SPREAD_LOSS = "focal"              # dengesiz maske için focal / weighted BCE
+SPREAD_METRICS = ["AUC", "Precision", "Recall"]
+SPREAD_EPOCHS = 120               # daha uzun eğitim (erken durdurma zaten koruyor)
+SPREAD_BATCH_SIZE = 32
+SPREAD_SHUFFLE_BUFFER = 512        # düşük RAM'de OOM'u önlemek için (16GB+ ise 2048 yapılabilir)
+SPREAD_POS_WEIGHT = 12.0           # yangın pikselleri seyrek -> pozitif ağırlık (arttırıldı)
+SPREAD_EARLY_STOP_PATIENCE = 18    # daha uzun sabır -> daha iyi yakınsama
+SPREAD_REDUCE_LR_PATIENCE = 7
+# Focal loss parametreleri (ayarlanabilir)
+SPREAD_FOCAL_GAMMA = 2.0           # zor örneklere odak
+SPREAD_FOCAL_ALPHA = 0.80          # pozitif (yangın) sınıfa ağırlık (0.75 -> 0.80)
+
+# ---- TFRecord konumu ----
+SPREAD_TFRECORD_GLOB = str(DATA_SPREAD_DIR / "*.tfrecord.gz")
+# CPU'da hızlı deneme: sadece ilk N dosyayı kullan (0 = hepsi).
+# Tam veri seti çok yavaşsa 10-20 gibi bir değer verip hızlı baseline al.
+SPREAD_MAX_FILES = 0
+
+
 if __name__ == "__main__":
     # Konfigürasyonu test et
     ensure_directories_exist()
     print("✅ Tüm dizinler oluşturuldu!")
     print(f"📁 BASE_DIR: {BASE_DIR}")
+    print("--- ESKİ (risk) ---")
     print(f"📊 Özellikler: {FEATURES}")
     print(f"🎯 Hedef: {TARGET}")
+    print("--- YENİ (yangın büyüme / raster) ---")
+    print(f"🧊 Girdi kanalları ({SPREAD_N_CHANNELS}): {SPREAD_INPUT_BANDS}")
+    print(f"🎯 Hedef bant: {SPREAD_TARGET_BAND}")
+    print(f"🗺️  Yama: {PATCH_SIZE}x{PATCH_SIZE} (model {MODEL_PATCH})")
+    print(f"🏷️  Büyüme sınıfları: {GROWTH_CLASSES}")

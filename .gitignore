@@ -41,9 +41,10 @@ env/
 *.sublime-workspace
 
 # Jupyter Notebook
+# NOTE: noteboks/colab_notebook.ipynb is a primary deliverable and IS tracked.
+# Only checkpoint directories are ignored.
 .ipynb_checkpoints
 *.ipynb_checkpoints
-*.ipynb
 
 # Test & Coverage
 .pytest_cache/
@@ -53,11 +54,20 @@ htmlcov/
 .tox/
 .hypothesis/
 
-# Data & Models (Büyük dosyalar)
+# Data & Models (Büyük dosyalar / large files)
 data/raw/
 data/processed/
-models/
+data/spread/
+data/spread_v1_legacy/
 outputs/
+
+# Model weights are large and regenerable; normalisation statistics are neither and
+# are required to reproduce a result, so they are tracked.
+# Model ağırlıkları büyük ve yeniden üretilebilir; normalizasyon istatistikleri ise
+# değil ve bir sonucu yeniden üretmek için gerekli, bu yüzden takip edilir.
+models/*
+!models/
+!models/norm_stats.json
 
 # Logs
 logs/
@@ -80,11 +90,29 @@ Thumbs.db
 *~
 
 # Specific to Fire AI project
+# Generated reports and maps live under outputs/ (already ignored). Documentation
+# under docs/ may legitimately contain HTML and is tracked.
+# Üretilen rapor ve haritalar outputs/ altındadır (zaten yok sayılır). docs/ altındaki
+# belgeler meşru olarak HTML içerebilir ve takip edilir.
 predictions.csv
-*.html
-fire_risk_map.html
+outputs/**/*.html
 *.pkl
 
 # Config files with sensitive data
 *.keyfile
 credentials.json
+
+# Personal and administrative documents. This repository is PUBLIC.
+# paper/ holds parental consent forms (muvafakatnameler.pdf), CVs of six minors
+# (ÖZGEÇMİŞLER.docx), sponsorship correspondence and funding applications. None of
+# that belongs in a public repository. The manuscript is also withheld here because
+# IAF publication rules govern when a congress paper may be distributed.
+# Publish individual files deliberately with `git add -f` if and when you decide to.
+#
+# Kişisel ve idari belgeler. BU DEPO HERKESE AÇIKTIR.
+# paper/ klasöründe veli muvafakatnameleri, altı reşit olmayan öğrencinin
+# özgeçmişleri, sponsorluk yazışmaları ve burs başvuruları var. Bunların hiçbiri
+# herkese açık bir depoda bulunmamalı. Bildiri metni de burada tutulmuyor; bir
+# kongre bildirisinin ne zaman dağıtılabileceğini IAF kuralları belirler.
+# Karar verdiğinizde tek tek `git add -f` ile bilinçli olarak yayımlayın.
+paper/
