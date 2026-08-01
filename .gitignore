@@ -116,3 +116,7 @@ credentials.json
 # kongre bildirisinin ne zaman dağıtılabileceğini IAF kuralları belirler.
 # Karar verdiğinizde tek tek `git add -f` ile bilinçli olarak yayımlayın.
 paper/
+
+# Local caches (regenerable, machine-specific). / Yerel önbellekler (yeniden üretilebilir).
+# graphify-out/ is rebuilt with `/graphify .`; ~/ignis-cache holds the memmap arrays.
+graphify-out/
