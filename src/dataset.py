@@ -167,7 +167,7 @@ class SpreadDataset(Dataset):
             raise RuntimeError(
                 f"Split {split!r} is empty. / {split!r} bölmesi boş.\n"
                 f"Years present in the archive: "
-                f"{sorted(set(np.asarray(self.meta['date']) // 10000))}\n"
+                f"{sorted({int(y) for y in np.asarray(self.meta['date']) // 10000})}\n"
                 f"Configured: {SPREAD_SPLIT_YEARS}")
 
     def __len__(self):
@@ -315,7 +315,7 @@ def describe_splits(version=None):
         if len(idx) == 0:
             print(f"{name:<14}{0:>9}{'—':>28}{'—':>12}")
             continue
-        yrs = sorted(set(np.asarray(meta["date"])[idx] // 10000))
+        yrs = sorted({int(y) for y in np.asarray(meta["date"])[idx] // 10000})
         sub = idx[:: max(1, len(idx) // 2000)]
         y = np.asarray(array[sub][:, i_next, sl, sl], dtype=np.float32)
         if i_next2 is not None:
