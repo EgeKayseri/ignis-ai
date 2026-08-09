@@ -379,17 +379,71 @@ TFRecord reader. These are the only measured model numbers that exist.
 Causes 1 and 2 are absent from the manuscript's own diagnosis and were found by direct
 inspection of the archive.
 
-### 9.3 Rebuilt pipeline
+### 9.3 Rebuilt pipeline — v5, measured 9 August 2026
 
-**To be filled in once training is complete.** No number will be reported here until it
-has been measured on the held-out test split (2025–2026) with a threshold calibrated on
-validation only.
+Held-out test split: **2025 + 2026, 13,792 patches**, never seen in training or model
+selection. The decision threshold (0.2333) was calibrated on the **validation** split to
+maximise F1 and then held fixed. It was never retuned on test.
 
-The acceptance criterion is explicit: **the model must beat persistence (IoU 0.0306,
-F1 0.0595).** If it does not, that will be reported as such.
+| | Precision | Recall | F1 | IoU |
+|---|---|---|---|---|
+| **MODEL** | 0.1054 | 0.5641 | 0.1776 | **0.0974** |
+| **Persistence** | 0.1721 | 0.2720 | 0.2108 | **0.1178** |
+| Dilated persistence | 0.1209 | 0.4208 | 0.1878 | 0.1036 |
+| Wind-directed growth | 0.1460 | 0.3299 | 0.2024 | 0.1126 |
 
-Baselines computed for comparison (`src/baselines.py`): persistence, dilated persistence,
-and wind-directed growth.
+| Context | Value |
+|---|---|
+| AUC-PR | 0.1789 |
+| ROC-AUC | 0.8932 |
+| Positive pixel prevalence (of observed pixels) | 1.0816 % |
+| Patch-level accuracy | 0.6212 |
+| Majority-class share | 0.7683 |
+
+**The acceptance criterion is not met. The model loses to persistence on the test split
+(IoU 0.0974 against 0.1178).** Patch accuracy 0.6212 remains below the majority-class
+share 0.7683. This is stated first because it is the result.
+
+Every quantity improved substantially over v1 — IoU 0.0165 → 0.0974, AUC-PR
+0.0210 → 0.1789 — but **the baseline improved too**, and it is the comparison that
+decides, not the absolute number. The v1 and v5 figures are not directly comparable in
+any case: v5 scores only pixels that were actually observed, which is a different and
+more honest denominator.
+
+#### Where the loss comes from
+
+Diagnosis at the **same fixed validation threshold**, splitting the held-out data by year:
+
+| Split | Patches | Model IoU | Persistence IoU | |
+|---|---|---|---|---|
+| Validation 2024 | 13,049 | **0.0442** | 0.0332 | model wins, +33 % |
+| Test 2025 | 8,906 | 0.1270 | **0.1493** | persistence wins |
+| Test 2026 | 4,886 | **0.0658** | 0.0428 | model wins, +54 % |
+
+The model beats persistence in **two of the three held-out years**, and loses in 2025 —
+which is 65 % of the test split. 2025 was an anomalous season: mean burning pixels per
+patch **19.03**, against ~11 in both 2024 and 2026, with persistence IoU 0.1474 against
+~0.035. Large, long-lived fires are precisely the regime in which "tomorrow = today" is
+hardest to beat, because such a fire is still burning tomorrow almost by definition.
+
+All three years cover the same June–October window, so the comparison is seasonally fair.
+**2026 ends on 25 July** (55 days against ~151), so it is a partial season and its result
+carries correspondingly less weight.
+
+The error profile is systematic **over-prediction**: recall 0.5641 against persistence's
+0.2720, but precision 0.1054 against 0.1721. The network finds roughly twice as much of
+the real fire as the baseline and pays for it in false positives.
+
+#### What this does not yet establish
+
+The result is a measurement of one training run, not a ceiling on the approach.
+Best validation AUC-PR occurred at **epoch 2**; the following 18 epochs never improved on
+it while training loss fell 0.60 → 0.50 and validation loss rose 0.63 → 0.70. That is
+memorisation of the training years. `SPREAD_POS_WEIGHT = 12.0` has never been swept and
+is a plausible direct cause of the precision collapse, and only a single year-split has
+been run, so the year-to-year variance visible above is unquantified.
+
+Reproduce the per-year table with `python peryear_diag.py`.
 
 ## 10. Installation / Kurulum
 
