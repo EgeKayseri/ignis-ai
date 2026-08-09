@@ -44,8 +44,8 @@ Fast Startup is disabled and Windows is shut down fully, that mount is read-only
 | v5 archive | **Landed and verified.** 1096 shards, 2019–2026, in `data/spread_v5/`. |
 | Cache | `~/ignis-cache/v5` — 67,056 patches × 26 bands, 27.4 GB. 0 short, 0 missing, 0 NaN. |
 | Splits | train 40,215 / val 13,049 / test 13,792. |
-| Training | **First real run in progress.** No test result yet. |
-| Reported results | Still the v1 numbers below. **Nothing new has been measured.** |
+| Training | **Done.** 48.7 min, early-stopped at epoch 20/120, best val AUC-PR 0.0434 at **epoch 2**. |
+| Reported results | **v5 measured on the test split — see below. The model loses to persistence.** |
 
 ### What v5 actually fixed, measured
 
@@ -100,7 +100,60 @@ four probe dates, including the most recent — where v4 died) and a **one-day s
 test**, both before any bulk submission. Submission is parallel (8 workers) and keeps a
 durable ledger in Drive so a Colab disconnect cannot cause duplicate or lost days.
 
-## Ground truth about current performance
+## v5 result — measured 9 August 2026, TEST split
+
+Held-out test = 2025 + 2026, 13,792 patches. Threshold 0.2333, calibrated on
+**validation** to maximise F1 and then held fixed. **Never retuned on test.**
+
+| | precision | recall | F1 | IoU |
+|---|---|---|---|---|
+| **MODEL** | 0.1054 | 0.5641 | 0.1776 | **0.0974** |
+| **persistence** | 0.1721 | 0.2720 | 0.2108 | **0.1178** |
+| dilated persistence | 0.1209 | 0.4208 | 0.1878 | 0.1036 |
+| wind-directed growth | 0.1460 | 0.3299 | 0.2024 | 0.1126 |
+
+AUC-PR 0.1789 · ROC-AUC 0.8932 · positive rate 1.0816 % · patch accuracy 0.6212
+against a majority-class share of 0.7683.
+
+**The model loses to persistence on the test split (IoU 0.0974 vs 0.1178).** The
+acceptance criterion is not met. This is the headline number and it stays.
+
+### Where the loss comes from
+
+Everything below is diagnosis at the **fixed validation threshold** — nothing was
+retuned on test.
+
+| Split | n | model IoU | persistence IoU | verdict |
+|---|---|---|---|---|
+| val 2024 | 13,049 | **0.0442** | 0.0332 | model wins, +33 % |
+| test 2025 | 8,906 | 0.1270 | **0.1493** | persistence wins |
+| test 2026 | 4,886 | **0.0658** | 0.0428 | model wins, +54 % |
+
+**The model beats persistence in two of the three held-out years and loses in 2025 —
+which is 65 % of the test split.** 2025 was an anomalous season: mean burning pixels
+per patch 19.03 versus ~11 in 2024 and 2026, and persistence IoU 0.1474 versus ~0.035.
+Large, long-lived fires are exactly the regime where "tomorrow = today" is hardest to
+beat. All three years cover the same June–October season, though **2026 stops on
+25 July** (55 days), so it is a partial season and its win carries less weight.
+
+The model's error profile is over-prediction: recall 0.5641 against persistence's
+0.2720, but precision 0.1054 against 0.1721. It finds twice as much of the real fire
+and pays for it in false positives.
+
+### What has not been tried
+
+Do not treat the loss as final without these. **Do not tune on the test split.**
+
+- Best validation AUC-PR came at **epoch 2** and 18 further epochs never beat it, while
+  train loss fell 0.60 → 0.50 and val loss rose 0.63 → 0.70. That is memorisation, not
+  learning; regularisation and augmentation are under-explored.
+- `SPREAD_POS_WEIGHT = 12.0` pushes recall hard and is a plausible cause of the
+  precision collapse. It has never been swept.
+- Year-to-year variance is clearly large, but only one split has ever been run.
+  Leave-one-year-out cross-validation would show whether 2025 is an outlier or whether
+  the model is simply fragile.
+
+## Historical: v1 performance (superseded)
 
 These were **measured**, not estimated — 45 shards / 1054 patches sampled from the v1
 archive with a pure-Python TFRecord reader. Do not soften or round them away.

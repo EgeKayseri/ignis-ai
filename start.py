@@ -206,7 +206,7 @@ def run_evaluation():
                                            report_dir=REPORT_DIR)
     print()
     ok(f"model   IoU={metrics['iou']:.4f}  F1={metrics['f1']:.4f}  "
-       f"AUC-PR={metrics['ap']:.4f}  ROC-AUC={metrics.get('roc_auc', float('nan')):.4f}")
+       f"AUC-PR={metrics['ap']:.4f}  ROC-AUC={metrics.get('roc', float('nan')):.4f}")
 
     # A score means nothing without the bar it has to clear.
     # Bir skor, aşması gereken çizgi olmadan anlamsızdır.
