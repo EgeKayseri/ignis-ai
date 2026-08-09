@@ -181,15 +181,42 @@ def save_norm_stats(stats, path=None, extra=None):
     return path
 
 
-def load_norm_stats(path=None):
-    """Load normalisation statistics. / İstatistikleri yükle."""
+def load_norm_stats(path=None, version=None):
+    """Load normalisation statistics, verifying the schema they came from.
+    Normalizasyon istatistiklerini yükle; hangi şemadan geldiğini DOĞRULA.
+
+    The version check is not decoration. train.py recomputes when the schema
+    changes, but evaluate.py only reads — so without this a v2 statistics file
+    would be applied to v5 data. The shared band names would get the wrong mean
+    and standard deviation, and v5's new bands (`vpd`, `burn_age`,
+    `days_since_rain`) would silently fall back to mean 0 / std 1, i.e. no
+    normalisation at all on exactly the channels that were added to help.
+    Nothing would raise; the numbers would just be wrong.
+
+    Sürüm kontrolü süs değildir. train.py şema değişince yeniden hesaplar ama
+    evaluate.py yalnızca okur; bu kontrol olmadan v2 istatistikleri v5 verisine
+    uygulanır ve v5'in yeni bantları sessizce hiç normalize edilmez.
+    """
     path = Path(path or SPREAD_NORM_STATS_FILE)
     if not path.exists():
         raise FileNotFoundError(
             f"No normalisation statistics at {path}\n"
             f"They are written by src/train.py from the training split.\n"
             f"İstatistikler eğitim sırasında yazılır; önce train.py çalıştırın.")
-    return json.loads(path.read_text(encoding="utf-8"))["stats"]
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    found = payload.get("version")
+    if version is not None and found != version:
+        raise RuntimeError(
+            f"NORMALISATION STATS VERSION MISMATCH / İSTATİSTİK SÜRÜM UYUŞMAZLIĞI\n"
+            f"  {path} was computed from schema {found!r}, but {version!r} was "
+            f"requested.\n"
+            f"  Applying these would use the wrong mean/std, and any band absent "
+            f"from {found!r}\n"
+            f"  would go unnormalised. Retrain, or delete the file and rerun "
+            f"train.py --version {version}.\n"
+            f"  Yanlış ortalama/std kullanılırdı; yeniden eğitin ya da dosyayı "
+            f"silip train.py'yi çalıştırın.")
+    return payload["stats"]
 
 
 # ----------------------------------------------------------------------

@@ -23,43 +23,60 @@ is much harder. Never conflate the two — the distinction is load-bearing in th
 
 ## Current status — read this first
 
-**Snapshot: 2 August 2026.** Update this section when the situation changes; a new
+**Snapshot: 9 August 2026.** Update this section when the situation changes; a new
 session should be able to start work from it alone.
+
+### Where the project lives
+
+**`~/Projects/ignis` on ext4.** This is now the working copy — not `/mnt/windows/PROJE/ignis`.
+The NTFS mount went read-only and then unmounted entirely mid-session because Windows
+was left **hibernated** (`ntfs-3g`: *"Windows is hibernated, refused to mount"*). Until
+Fast Startup is disabled and Windows is shut down fully, that mount is read-only at best.
+`~/Projects/ignis` has no such problem and is where everything runs.
 
 ### Where the project actually is
 
 | Thing | State |
 |---|---|
-| Pipeline code | **Ported to PyTorch, complete, runs.** All modules execute on the GPU. |
-| GPU | **Working.** `AMD Radeon RX 9070 XT`, ROCm/HIP 7.2.53211, torch 2.13.0, bf16 supported. |
-| U-Net | **Verified 1,935,617 params**, bottleneck 45.8 % — matches the manuscript's ~1.9 M and the guide's "46 %". |
-| v2 archive | 598 shards on disk, converted to `~/ignis-cache/v2` (10 GB, 0 short, 0 missing). **Missing 2019 and 2020.** |
-| v5 archive | **Being generated.** Exports submitted from `colab_notebook_v5.ipynb`; `data/spread_v5/` still empty. |
-| Training | **Not yet run for real.** Only a smoke test on v2. No result exists for the rebuilt pipeline. |
-| Reported results | Still the v1 numbers below. Nothing new has been measured. |
+| Pipeline code | **Ported to PyTorch, complete, runs end to end.** |
+| GPU | **Working.** `AMD Radeon RX 9070 XT`, ROCm/HIP 7.2.53211, torch 2.13.0, bf16. |
+| U-Net | **Verified 1,935,617 params** at 28 input channels (v5), bottleneck 45.8 %. Matches the manuscript's ~1.9 M. |
+| v5 archive | **Landed and verified.** 1096 shards, 2019–2026, in `data/spread_v5/`. |
+| Cache | `~/ignis-cache/v5` — 67,056 patches × 26 bands, 27.4 GB. 0 short, 0 missing, 0 NaN. |
+| Splits | train 40,215 / val 13,049 / test 13,792. |
+| Training | **First real run in progress.** No test result yet. |
+| Reported results | Still the v1 numbers below. **Nothing new has been measured.** |
+
+### What v5 actually fixed, measured
+
+| Check | v2 | v5 |
+|---|---|---|
+| Training patches | 10,595 | **40,215** (2019–2020 now present) |
+| Patches with an empty target | 58.9 % | **47.5 %** |
+| Positive prevalence | 0.27 % of all pixels | **1.23 % of observed pixels** |
+| Environmental zero-rate spread | — | **18.79 pp** — no uniform-zero signature |
+
+GEE produced **no shards at all** between 2022-10-10 and 2022-10-22, independently
+confirming the Terra outage; `KNOWN_OUTAGES` therefore had nothing to skip.
 
 ### The immediate next step
 
-When `data/spread_v5/` is populated:
-
 ```bash
-python src/tfrecord_to_npy.py --version v5 --verify
-python src/dataset.py
-python src/baselines.py --version v5 --split test
-python src/train.py --version v5
-python src/evaluate.py --version v5
+python start.py                 # environment -> data -> cache -> train -> evaluate
 ```
 
 **Acceptance criterion, agreed with the team:** the model must beat the persistence
-baseline (IoU 0.0306, F1 0.0595). If it does not, stop and diagnose. **Do not tune on
-the test split and do not report a number that was not measured on it.**
+baseline. `evaluate.py` recomputes the baselines on the **same pixels** as the model,
+and that same-pixel number is the real bar — the v1 figures (IoU 0.0306, F1 0.0595)
+were measured on different data and are only a reference point. If the model does not
+clear it, stop and diagnose. **Do not tune on the test split and do not report a number
+that was not measured on it.**
 
 ### Open issues
 
-- **v2 has no 2019 or 2020 data** (years present: 2021×1, 2022, 2023, 2024, 2025, 2026).
-  The configured split is train 2019–2023 / val 2024 / test 2025–2026, so on v2 the
-  training set is effectively 2021–2023. v5 is being regenerated over the full range;
-  check the year coverage again once it lands rather than assuming it is complete.
+- Training's validation AUC-PR peaked early (epoch 2) and drifted down while train loss
+  kept falling — mild overfitting. Worth revisiting dropout / augmentation / early stop
+  before treating any checkpoint as final.
 - `describe_splits()` prints years as `np.int32(2022)` — cosmetic only.
 
 ### Recent history worth knowing
@@ -121,20 +138,27 @@ an improved number that has not been measured on the held-out split.
 
 ## Dataset versions
 
-Four schemas exist. **Never mix them in one directory** — the loader reconstructs the
-channel axis from band order alone and short records are silently wrong.
+**Only v5 is in the project.** The older archives were moved out to `~/ignis-archive/`
+so nothing stale can be loaded or quoted by accident. They are still on disk and can be
+deleted whenever — they cost hours of GEE export to regenerate, which is the only
+reason they were kept.
+
+`tfrecord_to_npy.py` still supports every schema, and the historical contracts remain
+documented below, because the v1 numbers in this file were measured on v1 data.
 
 | Version | Location | Input bands | Notes |
 |---|---|---|---|
-| v1 | `data/spread_v1_legacy/` | 14 | Original archive, 2019 – 26 Jul 2021, 360 shards. Superseded. |
-| v2 | `data/spread/` | 14 | 2019–2026, ~1131 shards. Adds `fire_next2`, `valid`. |
-| v3 | `data/spread_v3/` | 19 | v2 plus temporal context and fire weather. |
-| v5 | `data/spread_v5/` | 21 | v3 plus `days_since_rain`, `burn_age`, `valid_next`/`valid_next2`. Current. |
+| **v5** | **`data/spread_v5/`** | **21** | **Live.** 1096 shards, 2019–2026. Adds `days_since_rain`, `burn_age`, `valid_next`/`valid_next2`. |
+| v3 | archived | 19 | v2 plus temporal context and fire weather. Never used for a result. |
+| v2 | archived | 14 | 2019–2026 nominally, but **no 2019 or 2020 on disk**. |
+| v1 | archived | 14 | Original archive, 2019 – 26 Jul 2021. The measured numbers below are from this. |
 
-Generated by `noteboks/colab_notebook.ipynb` (v2), `colab_notebook_v3.ipynb` (v3)
-and `colab_notebook_v5.ipynb` (v5).
-All are resumable: re-running skips days already in Drive, already queued, or
-recorded in the Drive-side submission ledger.
+**Never mix schemas in one directory** — the loader reconstructs the channel axis from
+band order alone, so a mixed directory is silently wrong rather than an error.
+`tfrecord_to_npy.py` now detects the schema from feature *names* and refuses.
+
+v5 is generated by `noteboks/colab_notebook_v5.ipynb`, which is resumable: re-running
+skips days already in Drive, already queued, or recorded in the Drive-side ledger.
 
 ### Band contract (v5 — the live one)
 
@@ -223,9 +247,16 @@ r > 1.25 -> growing ; 0.75 <= r <= 1.25 -> stable ; r < 0.75 -> extinguishing
   ```
   gfx1201 is natively supported in ROCm 7.2 — do **not** set `HSA_OVERRIDE_GFX_VERSION`.
   Use `bfloat16` autocast, not `float16`.
-- **The repo lives on `/mnt/windows`, an NTFS fuseblk mount.** Per-epoch I/O against it
-  is slow. Convert TFRecords once into a memory-mapped cache under `~/ignis-cache/`
-  (local ext4) and train from there.
+- **The working copy is `~/Projects/ignis` on ext4.** The old location
+  `/mnt/windows/PROJE/ignis` is an NTFS fuseblk mount that is read-only while Windows is
+  hibernated, and it unmounted itself under memory pressure. Do not work there.
+- **Python is 3.14**, which changed the default multiprocessing start method from `fork`
+  to **`forkserver`**. Anything a `DataLoader` worker receives is now *pickled*, and
+  `np.memmap` pickles as a fully materialised array. `SpreadDataset` therefore defines
+  `__getstate__`/`__setstate__` to drop and reopen the handle; without them every worker
+  loads all 27 GB and the machine OOMs. Keep any new dataset attribute picklable.
+- TFRecords are converted once into a memory-mapped cache under `~/ignis-cache/`
+  and training reads from there.
 - **`rm` AND `cp` are aliased to sudo-requiring safe wrappers** in this user's zsh.
   Use `/usr/bin/rm` and `/usr/bin/cp` for anything scripted. A bare `cp` fails on
   the sudo prompt *after* partially running, and leaves a stray directory named
@@ -247,9 +278,8 @@ r > 1.25 -> growing ; 0.75 <= r <= 1.25 -> stable ; r < 0.75 -> extinguishing
 ## Repository map
 
 ```
-noteboks/colab_notebook.ipynb      GEE export, v2 schema (14 input bands)
-noteboks/colab_notebook_v3.ipynb   GEE export, v3 schema (19 input bands)
-noteboks/colab_notebook_v5.ipynb   GEE export, v5 schema (21 input bands) — CURRENT
+start.py                           single entry point: check -> cache -> train -> evaluate
+noteboks/colab_notebook_v5.ipynb   GEE export, v5 schema (21 input bands) — the only one kept
 src/config.py                      all constants; SPREAD_* section is the live one
 src/gee_config.py                  GEE collections and band contract
 src/device.py                      ROCm device selection, bfloat16 autocast
@@ -276,6 +306,13 @@ The eight static-risk modules (`preprocess`, `train`, `predict`, `test_accuracy`
 `map_visualization`, `main`, `examples`, `gee_data_processor`) and their model weights
 were deleted — they belonged to an abandoned susceptibility model.
 
+Moved out to `~/ignis-archive/` on 9 August 2026 so nothing stale can be quoted as a
+current result: the v1/v2/v3 archives, `data/raw` and `data/processed` (CSVs of the
+abandoned tabular model), every file that was in `outputs/`, `models/spread_unet.keras`
+(the old TensorFlow model), the v2 and v3 notebooks, the stale `graphify-out/`, and
+`src/utils.py` (imported by nothing). The broken 3.8 GB `venv/` was deleted outright.
+**`outputs/` is now empty by design** — anything in it was produced by the current code.
+
 The four legacy TensorFlow modules (`spread_dataset.py`, `spread_model.py`,
 `train_spread.py`, `evaluate_spread.py`) were deleted once the PyTorch port landed.
 The reporting half of `evaluate_spread.py` was ported into `evaluate.py`, not rewritten.
@@ -283,15 +320,21 @@ The reporting half of `evaluate_spread.py` was ported into `evaluate.py`, not re
 ## Commands
 
 ```bash
+python start.py                          # EVERYTHING: check -> cache -> train -> evaluate
+python start.py --epochs 40              # shorter training run
+python start.py --only eval              # one stage: check|data|cache|train|eval
+python start.py --skip-train             # evaluate the existing checkpoint
+python start.py --force-retrain          # overwrite an existing checkpoint
+
 python src/device.py                     # confirm the GPU is visible to PyTorch
 python src/tfrecord_to_npy.py --verify   # TFRecord -> memmap cache + integrity report
 python src/dataset.py                    # patch counts and prevalence per split
 python src/model.py                      # architecture + parameter breakdown
-python src/train.py                      # train the U-Net
 python src/baselines.py                  # persistence / dilated / wind-directed
-python src/evaluate.py                   # TEST split only, calibrated threshold
-python start.py                          # cache -> train -> evaluate, end to end
 ```
+
+`start.py` refuses to start a second training while another process holds `/dev/kfd`,
+so two runs cannot quietly compete for the GPU.
 
 `SPREAD_VERSION` in `src/config.py` selects the schema (**v5** currently); every
 script also takes `--version`.
@@ -352,6 +395,12 @@ something only six people will read.
   by detecting the schema from feature names, but put v5 in `data/spread_v5/`.
 - Colab disconnecting does **not** kill Earth Engine exports — they run on Google's
   servers. Only submission stops.
+- **Never hand a `np.memmap` to a `DataLoader` worker.** Under Python 3.14's `forkserver`
+  default it is pickled as a real array and each worker allocates the whole cache. This
+  already caused three OOM kills at ~27 GB resident each, and took the NTFS mount down
+  with it. `num_workers=0` masks the bug — it looks merely slow.
+- **A memory alarm during training is not automatically "just page cache".** Check
+  `dmesg | grep -i "killed process"` before saying so; here it was genuine RSS.
 
 ### Good openers
 

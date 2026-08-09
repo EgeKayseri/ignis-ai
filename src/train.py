@@ -252,7 +252,7 @@ def train(version=SPREAD_VERSION, epochs=SPREAD_EPOCHS, batch_size=SPREAD_BATCH_
 
 def main():
     ap = argparse.ArgumentParser(description="Train the fire-spread U-Net")
-    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3"])
+    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3", "v4", "v5"])
     ap.add_argument("--epochs", type=int, default=SPREAD_EPOCHS)
     ap.add_argument("--batch-size", type=int, default=SPREAD_BATCH_SIZE)
     ap.add_argument("--lr", type=float, default=SPREAD_LEARNING_RATE)

@@ -88,7 +88,7 @@ that confusion.
 ```
 Google Earth Engine                     Local workstation (Arch Linux + ROCm)
 ─────────────────────                   ──────────────────────────────────────
-8 source products                       data/spread/*.tfrecord.gz
+8 source products                       data/spread_v5/*.tfrecord.gz
    │  harmonise: EPSG:32635, 1 km             │
    │  daily composite                         │  src/tfrecord_to_npy.py
    ▼                                          ▼
@@ -146,10 +146,13 @@ aborts on a mixed directory, so this rule is enforced rather than merely documen
 
 | Version | Location | Input bands | Period | Shards | Notes |
 |---|---|---|---|---|---|
-| **v1** | `data/spread_v1_legacy/` | 14 | 2019 – 26 Jul 2021 | 360 | Original archive. All measured numbers below come from this. Superseded. |
-| **v2** | `data/spread/` | 14 | 2019 – 2026 | ~1131 | Adds `fire_next2` and `valid`. |
-| **v3** | `data/spread_v3/` | 19 | 2019 – 2026 | ~1131 | v2 plus temporal context and fire weather. |
-| **v5** | `data/spread_v5/` | 21 | 2019 – 2026 | ~1131 | v3 plus fuel history and, critically, `valid_next`. Current. |
+| **v5** | `data/spread_v5/` | 21 | 2019 – 2026 | 1096 | **Live.** v3 plus fuel history and, critically, `valid_next`. |
+| v3 | archived | 19 | 2019 – 2026 | — | v2 plus temporal context and fire weather. Never used for a result. |
+| v2 | archived | 14 | 2019 – 2026 | — | Adds `fire_next2` and `valid`. No 2019 or 2020 was ever on disk. |
+| v1 | archived | 14 | 2019 – 26 Jul 2021 | 360 | Original archive. All measured numbers below come from this. |
+
+Only v5 is kept in the working tree; the older archives were moved to `~/ignis-archive/`
+so a stale schema cannot be loaded or quoted by accident.
 
 Band order is **contractual** across three files — `noteboks/colab_notebook*.ipynb`,
 `src/gee_config.py` and `src/config.py`. Change it in all three or in none.
@@ -434,25 +437,57 @@ project.
 
 ### A note on storage
 
-The repository lives on `/mnt/windows`, an NTFS `fuseblk` mount. Per-epoch I/O against it
-is slow, and decompressing gzip TFRecords every epoch across FUSE dominates training time.
-`src/tfrecord_to_npy.py` converts the archive **once** into memory-mapped `.npy` arrays
-under `~/ignis-cache/` on local ext4; training reads only from there.
+The working copy is `~/Projects/ignis` on local ext4. An earlier location on an NTFS
+`fuseblk` mount proved unusable: it is forced read-only whenever Windows has been
+hibernated, and decompressing gzip TFRecords every epoch across FUSE dominated training
+time. `src/tfrecord_to_npy.py` converts the archive **once** into a memory-mapped array
+under `~/ignis-cache/`; training reads only from there.
+
+Because the cache is a `np.memmap`, it must never be pickled into a `DataLoader` worker.
+Python 3.14 defaults to the `forkserver` start method, which pickles the dataset object,
+and a memmap pickles as a fully materialised array — every worker would allocate the
+entire 27 GB cache. `SpreadDataset` defines `__getstate__`/`__setstate__` to drop the
+handle and reopen it inside the worker.
 
 ## 11. Running the pipeline / Hattı çalıştırma
 
+### The short version
+
+Once `data/spread_v5/` holds the shards, the whole project runs from one command:
+
+```bash
+python start.py
+```
+
+That checks the environment and the GPU, builds the memmap cache if it is missing or
+stale, trains the U-Net, evaluates it on the **test** split against recomputed
+baselines, and prints where the outputs went. Useful variants:
+
+```bash
+python start.py --epochs 40        # shorter training run
+python start.py --only eval        # one stage: check|data|cache|train|eval
+python start.py --skip-train       # evaluate the existing checkpoint
+python start.py --force-retrain    # overwrite an existing checkpoint
+```
+
+It refuses to launch a second training while another process holds `/dev/kfd`, so two
+runs cannot quietly compete for the GPU. The remaining steps below describe what each
+stage does, and how to run them individually.
+
 ### Step 1 — Generate the dataset (Google Colab + GEE)
 
-Open `noteboks/colab_notebook.ipynb` (v2) or `colab_notebook_v3.ipynb` (v3) in Colab and
-run all cells. Both are **resumable**: re-running skips days already written to Drive or
-already queued in Earth Engine. `SUBMIT_LIMIT` caps tasks per run; re-run sections 7 and 8
-to continue.
+Open `noteboks/colab_notebook_v5.ipynb` in Colab and run all cells. It is **resumable**:
+re-running skips days already written to Drive, already queued in Earth Engine, or
+recorded in the Drive-side submission ledger. `SUBMIT_LIMIT` caps tasks per run.
+A preflight and a one-day smoke test run before any bulk submission, because three
+earlier notebook revisions each reported success while exporting nothing.
 
 Task descriptions are namespaced by schema version (`firespread_v3_YYYYMMDD`) so a v2 run
 and a v3 run cannot be mistaken for one another by the resume scan. Downloaded shard names
 stay `firespread_YYYYMMDD.tfrecord.gz`.
 
-Download the resulting Drive folder into `data/spread/` (v2) or `data/spread_v3/` (v3).
+Download the resulting Drive folder into `data/spread_v5/` and unzip it there, so the
+directory holds `*.tfrecord.gz` shards directly.
 
 ### Step 2 — Convert to the local memmap cache
 
@@ -488,9 +523,7 @@ F1 **on validation**, and writes an HTML report, scorecard and folium map to
 
 ```
 noteboks/
-  colab_notebook.ipynb        GEE export, v2 schema (14 input bands)
-  colab_notebook_v3.ipynb     GEE export, v3 schema (19 input bands)
-  colab_notebook_v5.ipynb     GEE export, v5 schema (21 input bands) — current
+  colab_notebook_v5.ipynb     GEE export, v5 schema (21 input bands) — the only one kept
 
 src/
   config.py                   all constants; the SPREAD_* section is the live one
@@ -504,13 +537,9 @@ src/
   train.py                    AdamW, cosine warm restarts, bf16, best-AUC-PR checkpoint
   baselines.py                persistence, dilated persistence, wind-directed growth
   evaluate.py                 test split only, threshold calibration, HTML reporting
-  utils.py                    shared helpers
 
 data/
-  spread/                     v2 archive (git-ignored)
-  spread_v3/                  v3 archive (git-ignored)
-  spread_v5/                  v5 archive (git-ignored)
-  spread_v1_legacy/           v1 archive, superseded (git-ignored)
+  spread_v5/                  v5 archive, 1096 shards (git-ignored)
 
 models/
   spread_unet.pt              trained weights

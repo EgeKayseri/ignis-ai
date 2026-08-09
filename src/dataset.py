@@ -125,6 +125,7 @@ class SpreadDataset(Dataset):
     def __init__(self, split="train", version=None, stats=None, augment=None,
                  target_mode=None, crop=MODEL_PATCH, indices=None):
         self.array, self.meta, self.manifest = load_cache(version)
+        self.version = version
         self.bands = self.manifest["bands"]
         self.input_bands = self.manifest["input_bands"]
         self.split = split
@@ -169,6 +170,21 @@ class SpreadDataset(Dataset):
                 f"Years present in the archive: "
                 f"{sorted({int(y) for y in np.asarray(self.meta['date']) // 10000})}\n"
                 f"Configured: {SPREAD_SPLIT_YEARS}")
+
+    # Do not ship the memmap to DataLoader workers. Python 3.14 defaults to
+    # the forkserver start method, which pickles this object into each worker,
+    # and np.memmap pickles as a REAL array -- every worker would materialise
+    # the entire cache (27 GB on v5) in RAM. Reopen the handle instead.
+    # np.memmap turşulanınca gerçek diziye dönüşür; her işçi tüm önbelleği
+    # belleğe çekerdi. Tutamağı işçide yeniden aç.
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["array"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.array, _, _ = load_cache(self.version)
 
     def __len__(self):
         return len(self.indices)

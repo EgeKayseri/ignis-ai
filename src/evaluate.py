@@ -170,7 +170,7 @@ def evaluate(version=SPREAD_VERSION, split="test", model_path=SPREAD_MODEL_FILE,
     print("IGNIS — evaluation / değerlendirme")
     print("=" * 66)
     device = get_device()
-    stats = load_norm_stats()
+    stats = load_norm_stats(version=version)
     model, ckpt = _load_model(device, model_path)
 
     # --- threshold from VALIDATION -----------------------------------
@@ -652,7 +652,7 @@ def _make_map(report_dir, lons, lats, gc_true, gc_pred):
 
 def main():
     ap = argparse.ArgumentParser(description="Evaluate on the held-out split")
-    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3"])
+    ap.add_argument("--version", default=SPREAD_VERSION, choices=["v1", "v2", "v3", "v4", "v5"])
     ap.add_argument("--split", default="test", choices=["val", "test"])
     ap.add_argument("--threshold", type=float, default=None,
                     help="override; by default calibrated on validation")
