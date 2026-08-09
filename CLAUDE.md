@@ -140,18 +140,79 @@ The model's error profile is over-prediction: recall 0.5641 against persistence'
 0.2720, but precision 0.1054 against 0.1721. It finds twice as much of the real fire
 and pays for it in false positives.
 
-### What has not been tried
+### Experiments run 9 August 2026 — all selected on validation
 
-Do not treat the loss as final without these. **Do not tune on the test split.**
+Every number here comes from `experiments.py`, `final_run.py`, `seed_noise.py` and
+`split_ablation.py`. The test split was opened exactly twice: once for the original
+protocol and once for `final_run.py`.
 
-- Best validation AUC-PR came at **epoch 2** and 18 further epochs never beat it, while
-  train loss fell 0.60 → 0.50 and val loss rose 0.63 → 0.70. That is memorisation, not
-  learning; regularisation and augmentation are under-explored.
-- `SPREAD_POS_WEIGHT = 12.0` pushes recall hard and is a plausible cause of the
-  precision collapse. It has never been swept.
-- Year-to-year variance is clearly large, but only one split has ever been run.
-  Leave-one-year-out cross-validation would show whether 2025 is an outlier or whether
-  the model is simply fragile.
+**The single biggest lever was not a hyperparameter — it was one more year of data.**
+
+| Change | Effect on val IoU |
+|---|---|
+| 8-config hyperparameter sweep | 0.0445 – 0.0489 (best: `wd 1e-3 + dropout 0.3`, +5.6 %) |
+| **Moving 2024 out of validation and into training** | **test IoU 0.0974 → 0.1182 (+21 %)** |
+
+The configured split reserved 2024 for validation, so the model never trained on the
+year immediately before the test period — 13,049 patches, 24 % of the usable data,
+spent on model selection alone. Training on 2019–2022 + 2024 and validating on 2023
+keeps the test split identical and recovers most of the gap.
+
+**Verdict after that fix: a tie, not a win.**
+
+| | IoU | F1 |
+|---|---|---|
+| MODEL (train incl. 2024) | 0.1182 | 0.2114 |
+| persistence | 0.1178 | 0.2108 |
+
+The margin is **0.0004**. Changing only the random seed moves validation IoU by
+**0.0023** (three seeds: 0.0463 / 0.0457 / 0.0480), and two runs at the *same* seed
+differ by 0.0015 because ROCm backward kernels are not deterministic. The margin is a
+quarter of same-seed noise. **Report this as indistinguishable from persistence.**
+It is a real improvement on the earlier clear loss, and it is not a win.
+
+### Hypotheses that were tested and failed
+
+Recorded because they were mine, and re-testing them would waste a day.
+
+- **`SPREAD_POS_WEIGHT` does not explain the precision collapse.** 12 → 4 → 1 gives val
+  IoU 0.0463 / 0.0445 / 0.0463. No trend.
+- **Direction-aware augmentation has no measurable effect.** Off 0.0461, on 0.0463 —
+  inside seed noise. The flip logic is correct; it simply does not help here.
+- **`focal_tversky` is much worse**, 0.0228, below persistence. Eliminated.
+
+### Leave-one-year-out, and its caveat
+
+| Held out | model IoU | persistence IoU |
+|---|---|---|
+| 2021 | 0.2552 | 0.2003 |
+| 2022 | 0.0713 | 0.0687 |
+| 2023 | 0.0408 | 0.0323 |
+| 2024 | 0.0443 | 0.0332 |
+| 2025 | 0.1927 | 0.1493 |
+
+Mean model IoU 0.1209 ± 0.0871. **These are optimistic**: `experiments.loyo()` selects
+both the stopping epoch and the threshold on the held-out year itself, so it measures
+an upper bound, not clean generalisation. Use it to compare years, never as a headline.
+
+What it does establish is that **persistence itself varies six-fold across years**
+(0.0323 in 2023 to 0.2003 in 2021). Any single train/val/test split was always going to
+give a high-variance verdict, and 2021 shows a strong-persistence year the model still
+wins, so "big fires ⇒ model loses" is not the whole story for 2025.
+
+### Never use a random split on this data
+
+Measured, not assumed:
+
+| Split | Test patches sharing a day with training |
+|---|---|
+| random 70/15/15 | **100.00 %** (all 1096 days appear in training) |
+| year split | **0.00 %** |
+
+Patches cut from the same day come from the same fire, overlap in space and share the
+same weather. `split_ablation.py` quantifies what that does to the score; its output is
+an ablation and must never be quoted as IGNIS performance. If a ratio-based split is
+ever wanted, group whole weeks or fire episodes — never individual patches.
 
 ## Historical: v1 performance (superseded)
 
