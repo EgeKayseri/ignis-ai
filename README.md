@@ -17,11 +17,13 @@ probability map.
 
 ## Scientific status / Bilimsel durum
 
-**This model does not yet beat its own baseline.** On the v1 archive, a trivial
-"tomorrow = today" persistence rule scores IoU 0.0306 and F1 0.0595; the trained network
-scores IoU 0.0165 and F1 0.0324. Section 9 reports this in full. The pipeline has since
-been rebuilt to address the diagnosed causes, but **no result from the rebuilt pipeline
-has been measured yet**, and none is claimed here.
+**The model is statistically indistinguishable from its own baseline, and does not beat
+it.** On the held-out 2025–2026 test split a trivial "tomorrow = today" persistence rule
+scores IoU 0.1178. The trained network scores IoU 0.0974 under the configured split, and
+0.1182 when the 2024 season is moved from validation into training. That best margin,
+**0.0004**, is a quarter of the run-to-run noise (0.0023 across random seeds), so it is a
+tie rather than a win. Section 9 reports all of it, including the v1 figures it
+supersedes.
 
 The defensible contribution today is a reproducible pipeline and an honestly reported
 baseline — not an operational prediction system.
@@ -336,7 +338,8 @@ pixels never enter the gradient.
 ### 9.1 Measured — v1 archive
 
 Measured on **45 shards / 1054 patches** sampled from the v1 archive with a pure-Python
-TFRecord reader. These are the only measured model numbers that exist.
+TFRecord reader. **These are superseded by the v5 results in § 9.3** and are retained
+only as the historical starting point.
 
 | Quantity | Model | Persistence baseline |
 |---|---|---|
@@ -436,14 +439,60 @@ the real fire as the baseline and pays for it in false positives.
 
 #### What this does not yet establish
 
-The result is a measurement of one training run, not a ceiling on the approach.
+The result is a measurement of one training protocol, not a ceiling on the approach.
 Best validation AUC-PR occurred at **epoch 2**; the following 18 epochs never improved on
 it while training loss fell 0.60 → 0.50 and validation loss rose 0.63 → 0.70. That is
-memorisation of the training years. `SPREAD_POS_WEIGHT = 12.0` has never been swept and
-is a plausible direct cause of the precision collapse, and only a single year-split has
-been run, so the year-to-year variance visible above is unquantified.
+memorisation of the training years, and dropout, augmentation and the early-stopping rule
+have not been revisited since.
 
-Reproduce the per-year table with `python peryear_diag.py`.
+Three hypotheses have since been tested and **failed**. They are recorded so that nobody
+spends a day re-testing them:
+
+- `SPREAD_POS_WEIGHT` does **not** explain the precision collapse — 12 / 4 / 1 give
+  validation IoU 0.0463 / 0.0445 / 0.0463, with no trend.
+- Direction-aware augmentation has no measurable effect — 0.0461 off against 0.0463 on,
+  inside seed noise. The flip logic is correct; it simply does not help here.
+- `focal_tversky` is much worse at 0.0228, below persistence. Eliminated.
+
+Reproduce the per-year table with `python peryear_diag.py`, the seed spread with
+`python seed_noise.py`, and the split comparison with `python split_ablation.py`.
+
+### 9.4 The largest single lever was data, not tuning
+
+An eight-configuration hyperparameter sweep moved validation IoU between 0.0445 and
+0.0489 — best `wd 1e-3 + dropout 0.3`, an improvement of 5.6 %. Moving **one season**
+from validation into training moved the test result four times as far.
+
+The configured split reserves 2024 for validation, so the model never trains on the year
+immediately before the test period — 13,049 patches, 24 % of the usable data, spent on
+model selection alone. Training on 2019–2022 + 2024 and validating on 2023 keeps the test
+split byte-for-byte identical:
+
+| | IoU | F1 |
+|---|---|---|
+| Model, configured split | 0.0974 | 0.1776 |
+| **Model, 2024 moved into training** | **0.1182** | **0.2114** |
+| Persistence | 0.1178 | 0.2108 |
+
+**Read this as a tie, not a win.** The margin is 0.0004. Changing only the random seed
+moves validation IoU by 0.0023 (0.0463 / 0.0457 / 0.0480 across three seeds), and two runs
+at the *same* seed differ by 0.0015 because ROCm backward kernels are not deterministic.
+The margin is a quarter of same-seed noise. It is a real improvement on the earlier clear
+loss, and it is not a win.
+
+Leave-one-year-out gives mean model IoU 0.1209 ± 0.0871. **These figures are optimistic**:
+`experiments.loyo()` selects both the stopping epoch and the threshold on the held-out
+year itself, so it measures an upper bound, not clean generalisation. Use it to compare
+years, never as a headline. What it does establish is that **persistence itself varies
+six-fold across years** — 0.0323 in 2023 against 0.2003 in 2021 — so any single
+train/val/test split was always going to give a high-variance verdict.
+
+**Never use a random split on this data.** Measured, not assumed: under a random 70/15/15
+split **100.00 %** of test patches share a fire day with a training patch, because all
+1096 days appear in training; under the year split, **0.00 %**. Patches cut from the same
+day come from the same fire, overlap in space and share the same weather.
+`split_ablation.py` quantifies the inflation this causes, and its output is an ablation —
+it must never be quoted as IGNIS performance.
 
 ## 10. Installation / Kurulum
 
@@ -622,10 +671,11 @@ mapped, not inferred — would raise that ceiling more than any modelling change
 cost of a 5-day revisit instead of daily.
 
 **No fuel moisture.** Live and dead fuel moisture are the strongest physical predictors of
-spread rate and are not among the current inputs. v3's `vpd` and antecedent precipitation
-are proxies for them, not measurements.
+spread rate and are not among the current inputs. v5's `vpd`, `days_since_rain` and
+antecedent precipitation are proxies for them, not measurements.
 
-**Class imbalance remains extreme** at 0.2686 % positive prevalence.
+**Class imbalance remains extreme** at 1.0816 % of observed pixels on the v5 test split
+(0.2686 % of all pixels under the v1 accounting).
 
 **Planned:** channel ablations to test whether wind actually contributes; comparison
 against a physics-based spread model; evaluation against OGM perimeters if obtained.

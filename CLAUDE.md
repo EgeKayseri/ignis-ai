@@ -18,8 +18,10 @@ is much harder. Never conflate the two — the distinction is load-bearing in th
 - **Authors:** six students at Antalya Yusuf Ziya Öner Science High School. Explain
   reasoning; do not assume ML or remote-sensing background.
 - **Repo:** `github.com/WhiteFoxYT/ignis-ai`
-- **Manuscript:** `paper/IGNIS_IAC2026_manuscript.docx` (read it before changing any
-  scientific claim — extract `word/document.xml` with `zipfile`).
+- **Manuscript:** `paper/ignispaperfinal4.docx` — the live one, fully on v5 numbers.
+  Read it before changing any scientific claim (extract `word/document.xml` with
+  `zipfile`). `IGNIS_IAC2026_manuscript.docx` is the superseded 11 August draft and
+  still carries v1 figures; do not quote from it.
 
 ## Current status — read this first
 
@@ -489,8 +491,9 @@ prints both by construction; keep it that way.
 ### Never accept an unmeasured number
 
 If a number is not in `outputs/reports/spread_metrics.json` or measured in-session, it
-does not exist. "Probably around 0.05" is worse than "not measured". This rule is why
-the README's section 9.3 is still blank.
+does not exist. "Probably around 0.05" is worse than "not measured". README sections 9.3
+and 9.4 stayed blank until 9 August 2026 for exactly this reason, and were filled only
+once the numbers existed.
 
 ### Say when a guide or doc is internal
 
