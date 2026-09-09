@@ -275,7 +275,7 @@ def ensure_directories_exist() -> None:
 # match in three places: the notebooks, gee_config.py and here.
 # ============================================================
 
-# ---- v2 şeması: 14 girdi bandı ----
+# ---- Eski şema: 14 girdi bandı / legacy schema, 14 input bands ----
 SPREAD_INPUT_BANDS_V2 = [
     "ndvi",          # bitki örtüsü indeksi          vegetation index
     "lst",           # arazi yüzey sıcaklığı (°C)    land surface temperature
@@ -293,7 +293,7 @@ SPREAD_INPUT_BANDS_V2 = [
     "fire",          # bugünün yangın maskesi (0/1)  fire mask, day t
 ]
 
-# ---- v3 şeması: 19 girdi bandı (v2 + zamansal bağlam + yangın hava durumu) ----
+# ---- Ara şema: 19 girdi bandı (+ zamansal bağlam, yangın hava durumu) ----
 SPREAD_INPUT_BANDS_V3 = [
     "ndvi", "lst", "air_temp", "humidity",
     "vpd",                                  # buhar basıncı açığı (kPa)  vapour pressure deficit
@@ -308,11 +308,8 @@ SPREAD_INPUT_BANDS_V3 = [
     "fire",
 ]
 
-# ---- v4/v5 şeması: 21 girdi bandı (v3 + yakıt/kuruluk geçmişi) ----
-# v5, v4 ile AYNI bant şemasını kullanır. v4 notebook'u sunucu tarafında
-# çöktüğü için hiç veri üretmedi; v5 onun düzeltilmiş hâlidir.
-# v5 uses the SAME band schema as v4. The v4 notebook never produced any data
-# because it crashed server-side; v5 is its corrected replacement.
+# ---- Güncel şema: 21 girdi bandı (+ yakıt ve kuruluk geçmişi) ----
+# ---- Current schema: 21 input bands (+ fuel and dryness history) ----
 SPREAD_INPUT_BANDS_V4 = [
     "ndvi", "lst", "air_temp", "humidity", "vpd",
     "wind_speed", "wind_u", "wind_v",
@@ -324,29 +321,30 @@ SPREAD_INPUT_BANDS_V4 = [
     "fire_prev2", "fire_prev1", "fire",
 ]
 
-# ---- Hedef ve yardımcı bantlar (v2 ve v3'te aynı) ----
+# ---- Hedef ve yardımcı bantlar / target and auxiliary bands ----
 SPREAD_TARGET_BAND = "fire_next"    # t+1 yangın maskesi   fire mask, day t+1
 SPREAD_TARGET2_BAND = "fire_next2"  # t+2 yangın maskesi   fire mask, day t+2
 SPREAD_VALID_BAND = "valid"         # 1 = tüm girdiler gözlendi   all inputs observed
 SPREAD_AUX_BANDS = [SPREAD_TARGET_BAND, SPREAD_TARGET2_BAND, SPREAD_VALID_BAND]
 
-# v1 arşivinde fire_next2 ve valid YOKTUR (yalnızca fire_next).
+# En eski arşivde fire_next2 ve valid YOKTUR (yalnızca fire_next).
 SPREAD_AUX_BANDS_V1 = [SPREAD_TARGET_BAND]
 
-# ---- v4: hedefin GERÇEKTEN gözlenip gözlenmediğini söyleyen bantlar ----
+# ---- Hedefin GERÇEKTEN gözlenip gözlenmediğini söyleyen bantlar ----
 # MODIS FireMask gözlem kalitesini zaten kodluyor (0,1,2 işlenmedi; 4 bulut;
-# 6 bilinmiyor; 3,5 gözlenmiş kara/su; 7,8,9 yangın). v2/v3 `fm.gte(7).unmask(0)`
+# 6 bilinmiyor; 3,5 gözlenmiş kara/su; 7,8,9 yangın). Erken bir uygulama
+# `fm.gte(7).unmask(0)`
 # yaptığı için BULUTLU bir piksel "yangın yok" olarak etiketleniyordu — yamaların
 # %58.9'unda t+1 hedefinin boş çıkmasının sebebi buydu (3. kök neden).
-# v4 bu bilgiyi taşır; eğitimde gözlenmemiş hedef pikselleri kayba girmez.
+# Bu bantlar o bilgiyi taşır; eğitimde gözlenmemiş hedef pikselleri kayba girmez.
 SPREAD_VALID_NEXT_BAND = "valid_next"
 SPREAD_VALID_NEXT2_BAND = "valid_next2"
 SPREAD_AUX_BANDS_V4 = SPREAD_AUX_BANDS + [SPREAD_VALID_NEXT_BAND,
                                           SPREAD_VALID_NEXT2_BAND]
 
 # ---- Aktif şema ----
-# 'v2' -> data/spread/ (14 girdi) ; 'v3' -> data/spread_v3/ (19 girdi)
-# 'v5' -> data/spread_v5/ (21 girdi) — güncel şema
+# Güncel şema ve veri dizini / active schema and its data directory:
+#   data/spread_v5/  —  21 girdi bandı / 21 input bands
 SPREAD_VERSION = "v5"
 
 _BANDS_BY_VERSION = {
@@ -354,7 +352,7 @@ _BANDS_BY_VERSION = {
     "v2": (SPREAD_INPUT_BANDS_V2, SPREAD_AUX_BANDS),
     "v3": (SPREAD_INPUT_BANDS_V3, SPREAD_AUX_BANDS),
     "v4": (SPREAD_INPUT_BANDS_V4, SPREAD_AUX_BANDS_V4),
-    "v5": (SPREAD_INPUT_BANDS_V4, SPREAD_AUX_BANDS_V4),   # same schema as v4
+    "v5": (SPREAD_INPUT_BANDS_V4, SPREAD_AUX_BANDS_V4),
 }
 
 DATA_SPREAD_V3_DIR = DATA_DIR / "spread_v3"

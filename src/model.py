@@ -185,10 +185,10 @@ def parameter_report(model, input_size=None):
 if __name__ == "__main__":
     import sys as _sys
 
-    from config import spread_bands
+    from config import spread_bands, SPREAD_VERSION
     from features import n_output_channels
 
-    version = _sys.argv[1] if len(_sys.argv) > 1 else "v2"
+    version = _sys.argv[1] if len(_sys.argv) > 1 else SPREAD_VERSION
     inp, _, _ = spread_bands(version)
     # dataset.py also feeds `valid` as an input channel
     ch = n_output_channels(list(inp) + ["valid"])

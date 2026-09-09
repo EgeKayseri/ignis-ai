@@ -149,8 +149,8 @@ class SpreadDataset(Dataset):
         self._i_next2 = self.bands.index("fire_next2") if "fire_next2" in self.bands else None
         self._i_valid = self.bands.index(SPREAD_VALID_BAND) if SPREAD_VALID_BAND in self.bands else None
         self._i_fire = self.bands.index("fire")
-        # v4 only: was the target actually observed, or was it cloud/no-data?
-        # Yalnızca v4: hedef gerçekten gözlendi mi, yoksa bulut/veri yok muydu?
+        # Was the target actually observed, or was it cloud / no-data?
+        # Hedef gerçekten gözlendi mi, yoksa bulut/veri yok muydu?
         self._i_vnext = (self.bands.index("valid_next")
                          if "valid_next" in self.bands else None)
         self._i_vnext2 = (self.bands.index("valid_next2")
@@ -174,7 +174,7 @@ class SpreadDataset(Dataset):
     # Do not ship the memmap to DataLoader workers. Python 3.14 defaults to
     # the forkserver start method, which pickles this object into each worker,
     # and np.memmap pickles as a REAL array -- every worker would materialise
-    # the entire cache (27 GB on v5) in RAM. Reopen the handle instead.
+    # the entire cache (27 GB) in RAM. Reopen the handle instead.
     # np.memmap turşulanınca gerçek diziye dönüşür; her işçi tüm önbelleği
     # belleğe çekerdi. Tutamağı işçide yeniden aç.
     def __getstate__(self):
@@ -197,10 +197,10 @@ class SpreadDataset(Dataset):
         """Mask of target pixels we are entitled to treat as ground truth.
         Hedefte gerçek referans sayabileceğimiz piksellerin maskesi.
 
-        v2/v3 wrote a literal 0 wherever MODIS did not look, so "cloud" and
-        "no fire" were the same number. Training on that teaches the network
-        cloud patterns. v4 exports valid_next/valid_next2 and this is where
-        they are spent.
+        An earlier implementation wrote a literal 0 wherever MODIS did not
+        look, so "cloud" and "no fire" were the same number. Training on that
+        teaches the network cloud patterns. The archive now exports
+        valid_next/valid_next2 and this is where they are spent.
 
         The rule is asymmetric, because the evidence is:
           * a DETECTION is trustworthy on its own — if we saw fire, there was
@@ -212,7 +212,8 @@ class SpreadDataset(Dataset):
         Kural asimetriktir: bir TESPİT tek başına güvenilirdir; bir YOKLUK ise
         ancak gerçekten bakıldıysa kanıttır.
 
-        Returns all-ones for v2/v3, so behaviour is unchanged there.
+        Returns all-ones when those bands are absent, so behaviour is
+        unchanged for archives that do not carry them.
         """
         if self._i_vnext is None:
             return np.ones_like(y)
@@ -235,7 +236,7 @@ class SpreadDataset(Dataset):
         x = build_input(raw, self.feature_bands, self.stats)
 
         # target = max(fire_next, fire_next2): fire activity within 24-48 h.
-        # The strict t+1 mask largely encodes satellite luck — 58.9 % of v1
+        # The strict t+1 mask largely encodes satellite luck — 58.9 % of
         # patches have zero fire on t+1 while 12.3 pixels burn on average on t.
         # Katı t+1 maskesi büyük ölçüde uydu şansını kodlar.
         y = block[self._i_next][self.sl, self.sl]

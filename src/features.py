@@ -3,13 +3,13 @@ Feature engineering — raw bands -> network input
 Öznitelik mühendisliği — ham bantlar -> ağ girdisi
 =================================================
 
-Turns the raw channels (14 in v2, 19 in v3, 21 in v4) into the tensor the U-Net
+Turns the 21 raw channels into the tensor the U-Net
 actually consumes. Four transformations, each fixing a defect in the raw data.
 
 Ham kanalları U-Net'in gerçekten tükettiği tensöre çevirir.
 
 1) z-score normalisation, statistics from the TRAINING SPLIT ONLY
-   In the v1 archive `elevation` had std 515.44 and max 4978, sitting next to
+   In the earlier archive `elevation` had std 515.44 and max 4978, sitting next to
    `soil_moisture` with std 0.07 and `ndvi` with std 0.20. A convolution sums
    weight*input across channels, so the elevation term dominated the sum by
    three orders of magnitude and the first layer effectively saw only elevation
@@ -64,9 +64,9 @@ CONTINUOUS = (
     "ndvi", "lst", "air_temp", "humidity", "vpd",
     "wind_speed", "wind_u", "wind_v",
     "soil_moisture", "elevation", "slope",
-    # v4: recency channels, already in days and bounded by their caps, but
+    # Recency channels, already in days and bounded by their caps, but
     # z-scored like any other continuous band so no channel dominates the
-    # first convolution. / v4: gün cinsinden geçmiş kanalları.
+    # first convolution. / Gün cinsinden geçmiş kanalları.
     "days_since_rain", "burn_age",
 )
 # Bands that get log1p before z-scoring (right-skewed, mostly zero).
@@ -185,17 +185,19 @@ def load_norm_stats(path=None, version=None):
     """Load normalisation statistics, verifying the schema they came from.
     Normalizasyon istatistiklerini yükle; hangi şemadan geldiğini DOĞRULA.
 
-    The version check is not decoration. train.py recomputes when the schema
-    changes, but evaluate.py only reads — so without this a v2 statistics file
-    would be applied to v5 data. The shared band names would get the wrong mean
-    and standard deviation, and v5's new bands (`vpd`, `burn_age`,
-    `days_since_rain`) would silently fall back to mean 0 / std 1, i.e. no
-    normalisation at all on exactly the channels that were added to help.
-    Nothing would raise; the numbers would just be wrong.
+    The schema check is not decoration. train.py recomputes when the band set
+    changes, but evaluate.py only reads — so without this a statistics file
+    written against a different band set would be applied anyway. The shared
+    band names would get the wrong mean and standard deviation, and the bands
+    absent from that file (`vpd`, `burn_age`, `days_since_rain`) would silently
+    fall back to mean 0 / std 1, i.e. no normalisation at all on exactly the
+    channels that were added to help. Nothing would raise; the numbers would
+    just be wrong.
 
-    Sürüm kontrolü süs değildir. train.py şema değişince yeniden hesaplar ama
-    evaluate.py yalnızca okur; bu kontrol olmadan v2 istatistikleri v5 verisine
-    uygulanır ve v5'in yeni bantları sessizce hiç normalize edilmez.
+    Şema kontrolü süs değildir. train.py bant kümesi değişince yeniden hesaplar
+    ama evaluate.py yalnızca okur; bu kontrol olmadan başka bir bant kümesine
+    göre yazılmış istatistikler uygulanır ve eksik bantlar sessizce hiç
+    normalize edilmez.
     """
     path = Path(path or SPREAD_NORM_STATS_FILE)
     if not path.exists():
@@ -277,11 +279,12 @@ def build_input(raw, band_names, stats):
 
 
 if __name__ == "__main__":
-    from config import spread_bands
+    from config import spread_bands, SPREAD_VERSION
 
-    for v in ("v2", "v3"):
+    for v in (SPREAD_VERSION,):
         inp, aux, _ = spread_bands(v)
         names = output_channel_names(inp)
-        print(f"{v}: {len(inp)} raw input bands -> {len(names)} network channels")
+        print(f"{v}: {len(inp)} raw input bands -> {len(names)} network channels"
+              f"  (+1 for `valid`, fed as an input by dataset.py -> {len(names) + 1})")
         print(f"     {names}")
         print()
