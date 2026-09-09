@@ -22,7 +22,7 @@ it.** On the held-out 2025–2026 test split a trivial "tomorrow = today" persis
 scores IoU 0.1178. The trained network scores IoU 0.0974 under the configured split, and
 0.1182 when the 2024 season is moved from validation into training. That best margin,
 **0.0004**, is a quarter of the run-to-run noise (0.0023 across random seeds), so it is a
-tie rather than a win. Section 9 reports all of it, including the v1 figures it
+tie rather than a win. Section 9 reports all of it, including the earlier figures it
 supersedes.
 
 The defensible contribution today is a reproducible pipeline and an honestly reported
@@ -41,7 +41,7 @@ baseline — not an operational prediction system.
 1. [The problem](#1-the-problem--problem)
 2. [What this is not](#2-what-this-is-not--bu-ne-değildir)
 3. [Method](#3-method--yöntem)
-4. [Dataset versions and band contracts](#4-dataset-versions-and-band-contracts--veri-seti-sürümleri-ve-bant-sözleşmeleri)
+4. [Dataset and band contract](#4-dataset-and-band-contract--veri-seti-ve-bant-sözleşmesi)
 5. [Target definition](#5-target-definition--hedef-tanımı)
 6. [Splits](#6-splits--bölmeler)
 7. [Known data exclusions](#7-known-data-exclusions--bilinen-veri-dışlamaları)
@@ -137,47 +137,20 @@ majority of genuine detections.
 Normalisation statistics are written to `models/norm_stats.json` and reused verbatim at
 evaluation time.
 
-## 4. Dataset versions and band contracts / Veri seti sürümleri ve bant sözleşmeleri
+## 4. Dataset and band contract / Veri seti ve bant sözleşmesi
 
-Four schemas exist (v1, v2, v3, v5; v4 was withdrawn — see below). **They must never be mixed in one directory** — the loader
-reconstructs the channel axis from band order alone, so a record from the wrong
-schema is silently misinterpreted rather than rejected.
+| Location | Input bands | Period | Shards | Valid patches |
+|---|---|---|---|---|
+| `data/spread_v5/` | 21 | 2019 – 2026 | 1096 | 67,056 |
 
-`tfrecord_to_npy.py` now detects the schema from each record's feature *names* and
-aborts on a mixed directory, so this rule is enforced rather than merely documented.
+Band order is **contractual** across three files — `noteboks/colab_notebook_v5.ipynb`,
+`src/gee_config.py` and `src/config.py`. Change it in all three or in none. The loader
+reconstructs the channel axis from band order alone, so a record written against a
+different band order is silently misinterpreted rather than rejected.
+`tfrecord_to_npy.py` therefore detects the schema from each record's feature *names* and
+aborts rather than guessing.
 
-| Version | Location | Input bands | Period | Shards | Notes |
-|---|---|---|---|---|---|
-| **v5** | `data/spread_v5/` | 21 | 2019 – 2026 | 1096 | **Live.** v3 plus fuel history and, critically, `valid_next`. |
-| v3 | archived | 19 | 2019 – 2026 | — | v2 plus temporal context and fire weather. Never used for a result. |
-| v2 | archived | 14 | 2019 – 2026 | — | Adds `fire_next2` and `valid`. No 2019 or 2020 was ever on disk. |
-| v1 | archived | 14 | 2019 – 26 Jul 2021 | 360 | Original archive. All measured numbers below come from this. |
-
-Only v5 is kept in the working tree; the older archives were moved to `~/ignis-archive/`
-so a stale schema cannot be loaded or quoted by accident.
-
-Band order is **contractual** across three files — `noteboks/colab_notebook*.ipynb`,
-`src/gee_config.py` and `src/config.py`. Change it in all three or in none.
-
-**v2 — 14 input bands + 3 target/auxiliary:**
-
-```
-ndvi  lst  air_temp  humidity  wind_speed  wind_u  wind_v
-precip  soil_moisture  elevation  slope  aspect  landcover  fire
-fire_next  fire_next2  valid
-```
-
-**v3 — 19 input bands + 3 target/auxiliary:**
-
-```
-ndvi  lst  air_temp  humidity  vpd  wind_speed  wind_u  wind_v
-precip  precip_7d  precip_30d  soil_moisture
-elevation  slope  aspect  landcover
-fire_prev2  fire_prev1  fire
-fire_next  fire_next2  valid
-```
-
-**v5 — 21 input bands + 5 target/auxiliary:**
+**21 input bands + 5 target/auxiliary:**
 
 ```
 ndvi  lst  air_temp  humidity  vpd
@@ -190,34 +163,37 @@ fire_prev2  fire_prev1  fire
 fire_next  fire_next2  valid  valid_next  valid_next2
 ```
 
-v5 adds two inputs and two auxiliary bands over v3. `days_since_rain` tracks
-fine-fuel dryness, which a 24-hour rainfall total cannot (that band is exactly
-zero on 91.4 % of pixels). `burn_age` is days since the pixel last burned: fire
-does not spread into ground whose fuel it has already consumed, and without it
-the network cannot tell the burnt interior of a fire from the unburnt land ahead
-of its front.
+After feature engineering the network sees **28 channels**: `aspect` becomes sin + cos,
+`landcover` becomes six fuel groups, and `valid` is fed as an input.
+
+Why each of the less obvious bands is there. `vpd` (vapour pressure deficit) is the
+single best atmospheric predictor of fuel dryness. `precip_7d` and `precip_30d` carry
+antecedent drying, which a 24-hour rainfall figure cannot express. `days_since_rain`
+tracks fine-fuel dryness, which a 24-hour total also cannot — that band is exactly zero
+on 91.4 % of pixels. `fire_prev1` and `fire_prev2` give the network two days of fire
+history, and so an observed spread *direction* rather than a single frame. `burn_age` is
+days since the pixel last burned: fire does not spread into ground whose fuel it has
+already consumed, and without it the network cannot tell the burnt interior of a fire
+from the unburnt land ahead of its front.
 
 The important pair is `valid_next` / `valid_next2`, described below.
 
-v3 adds five inputs over v2: `vpd` (vapour pressure deficit, the single best atmospheric
-predictor of fuel dryness), `precip_7d` and `precip_30d` (antecedent drying, which a
-24-hour rainfall figure cannot express), and `fire_prev1` / `fire_prev2` (two days of fire
-history, giving the network an observed spread *direction* rather than a single frame).
-
 ### The `valid` band
 
-In v1, `clip(REGION)` followed by `unmask(0)` wrote a literal zero wherever a source
-product had no observation. Roughly **15 % of every patch was a fabricated zero**, with an
+An early implementation used `clip(REGION)` followed by `unmask(0)`, which wrote a
+literal zero wherever a source product had no observation. Roughly **15 % of every patch was a fabricated zero**, with an
 identical zero rate across all environmental bands — "relative humidity = 0 %" was
 numerically indistinguishable from "not observed".
 
-v2 and v3 export a `valid` band that is 1 only where every input was genuinely observed.
-The loss is masked with it, so out-of-region and unobserved pixels contribute no gradient.
+The archive exports a `valid` band that is 1 only where every input was genuinely
+observed, and where MODIS observed the pixel *today* rather than merely leaving the
+environmental bands unmasked. The loss is masked with it, so out-of-region and
+unobserved pixels contribute no gradient.
 
 ### `valid_next` — the fix for the biggest diagnosed problem
 
-Root cause 3 said the target "largely encodes satellite luck": 58.9 % of v1
-patches have zero fire on *t*+1 while 12.3 pixels burn on average on *t*.
+Diagnosed cause 3 said the target "largely encodes satellite luck": 58.9 % of patches
+had zero fire on *t*+1 while 12.3 pixels burn on average on *t*.
 
 That was not purely a limitation of MODIS. It was partly **manufactured by our own
 code.** The `FireMask` band already encodes observation quality:
@@ -231,19 +207,16 @@ code.** The `FireMask` band already encodes observation quality:
 | 6 | unknown | **no** |
 | 7, 8, 9 | fire (low / nominal / high confidence) | yes |
 
-v2 and v3 did `fm.gte(7).unmask(0)`, which collapses "observed, not burning",
+An early implementation used `fm.gte(7).unmask(0)`, which collapses "observed, not burning",
 "hidden by cloud" and "never processed" into the single value 0. A pixel behind a
 cloud was labelled *no fire*, and the network was trained to reproduce that.
 
-v5 exports `valid_next` and `valid_next2`, so the loss can mask target pixels the
+The archive exports `valid_next` and `valid_next2`, so the loss can mask target pixels the
 satellite never actually looked at. `dataset.py` applies an asymmetric rule,
 because the evidence is asymmetric: a **detection** is trustworthy on its own,
 but an **absence** is only evidence if we looked. With
 `target = max(fire_next, fire_next2)`, a zero counts only when both days were
 observed.
-
-`valid` also tightened in v5: it now requires that MODIS observed the pixel
-*today*, not merely that the environmental bands were unmasked.
 
 ## 5. Target definition / Hedef tanımı
 
@@ -255,7 +228,7 @@ The strict *t*+1 mask is still exported, so both definitions remain available an
 comparable.
 
 The reason for widening the window is that the strict target largely encodes satellite
-luck rather than fire behaviour: **58.9 % of v1 patches have zero fire pixels on *t*+1**
+luck rather than fire behaviour: **58.9 % of patches have zero fire pixels on *t*+1**
 while 12.3 pixels burn on average on *t*. A fire that is plainly still burning disappears
 from the label because Terra and Aqua happened to overpass through cloud, or the thermal
 anomaly fell below the detection threshold at that moment. Training a network to reproduce
@@ -335,11 +308,11 @@ pixels never enter the gradient.
 
 ## 9. Results / Sonuçlar
 
-### 9.1 Measured — v1 archive
+### 9.1 The earlier implementation, measured
 
-Measured on **45 shards / 1054 patches** sampled from the v1 archive with a pure-Python
-TFRecord reader. **These are superseded by the v5 results in § 9.3** and are retained
-only as the historical starting point.
+Measured on **45 shards / 1054 patches** sampled from the earlier archive with a
+pure-Python TFRecord reader. **These are superseded by the results in § 9.3** and are
+retained only as the starting point the corrections below were measured against.
 
 | Quantity | Model | Persistence baseline |
 |---|---|---|
@@ -366,7 +339,7 @@ only as the historical starting point.
 - ROC-AUC 0.8468 alongside AUC-PR 0.0210 is not a contradiction. ROC-AUC is dominated by
   true negatives, of which there are 372 for every positive. AUC-PR is the honest metric
   here, and its random baseline is the prevalence itself, 0.00269.
-- These numbers are also **optimistic**: v1 evaluation globbed all shards including
+- These numbers are also **optimistic**: that evaluation globbed all shards including
   training days, so it was partly in-sample.
 
 ### 9.2 Diagnosed causes
@@ -382,7 +355,7 @@ only as the historical starting point.
 Causes 1 and 2 are absent from the manuscript's own diagnosis and were found by direct
 inspection of the archive.
 
-### 9.3 Rebuilt pipeline — v5, measured 9 August 2026
+### 9.3 Rebuilt pipeline, measured 9 August 2026
 
 Held-out test split: **2025 + 2026, 13,792 patches**, never seen in training or model
 selection. The decision threshold (0.2333) was calibrated on the **validation** split to
@@ -407,11 +380,11 @@ maximise F1 and then held fixed. It was never retuned on test.
 (IoU 0.0974 against 0.1178).** Patch accuracy 0.6212 remains below the majority-class
 share 0.7683. This is stated first because it is the result.
 
-Every quantity improved substantially over v1 — IoU 0.0165 → 0.0974, AUC-PR
-0.0210 → 0.1789 — but **the baseline improved too**, and it is the comparison that
-decides, not the absolute number. The v1 and v5 figures are not directly comparable in
-any case: v5 scores only pixels that were actually observed, which is a different and
-more honest denominator.
+Every quantity improved substantially over the earlier implementation — IoU
+0.0165 → 0.0974, AUC-PR 0.0210 → 0.1789 — but **the baseline improved too**, and it is
+the comparison that decides, not the absolute number. The two sets of figures are not
+directly comparable in any case: the rebuilt pipeline scores only pixels that were
+actually observed, which is a different and more honest denominator.
 
 #### Where the loss comes from
 
@@ -585,9 +558,10 @@ recorded in the Drive-side submission ledger. `SUBMIT_LIMIT` caps tasks per run.
 A preflight and a one-day smoke test run before any bulk submission, because three
 earlier notebook revisions each reported success while exporting nothing.
 
-Task descriptions are namespaced by schema version (`firespread_v3_YYYYMMDD`) so a v2 run
-and a v3 run cannot be mistaken for one another by the resume scan. Downloaded shard names
-stay `firespread_YYYYMMDD.tfrecord.gz`.
+Task descriptions are namespaced (`firespread_v5_YYYYMMDD`) so that an earlier run and a
+current one cannot be mistaken for one another by the resume scan — a namespacing bug is
+precisely what let one of those three revisions report success while exporting nothing.
+Downloaded shard names stay `firespread_YYYYMMDD.tfrecord.gz`.
 
 Download the resulting Drive folder into `data/spread_v5/` and unzip it there, so the
 directory holds `*.tfrecord.gz` shards directly.
@@ -626,7 +600,7 @@ F1 **on validation**, and writes an HTML report, scorecard and folium map to
 
 ```
 noteboks/
-  colab_notebook_v5.ipynb     GEE export, v5 schema (21 input bands) — the only one kept
+  colab_notebook_v5.ipynb     GEE export, 21 input bands
 
 src/
   config.py                   all constants; the SPREAD_* section is the live one
@@ -642,7 +616,7 @@ src/
   evaluate.py                 test split only, threshold calibration, HTML reporting
 
 data/
-  spread_v5/                  v5 archive, 1096 shards (git-ignored)
+  spread_v5/                  the archive, 1096 shards (git-ignored)
 
 models/
   spread_unet.pt              trained weights
@@ -671,11 +645,11 @@ mapped, not inferred — would raise that ceiling more than any modelling change
 cost of a 5-day revisit instead of daily.
 
 **No fuel moisture.** Live and dead fuel moisture are the strongest physical predictors of
-spread rate and are not among the current inputs. v5's `vpd`, `days_since_rain` and
+spread rate and are not among the current inputs. `vpd`, `days_since_rain` and
 antecedent precipitation are proxies for them, not measurements.
 
-**Class imbalance remains extreme** at 1.0816 % of observed pixels on the v5 test split
-(0.2686 % of all pixels under the v1 accounting).
+**Class imbalance remains extreme** at 1.0816 % of observed pixels on the test split
+(0.2686 % of all pixels under the earlier accounting).
 
 **Planned:** channel ablations to test whether wind actually contributes; comparison
 against a physics-based spread model; evaluation against OGM perimeters if obtained.
