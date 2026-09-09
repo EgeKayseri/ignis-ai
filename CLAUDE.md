@@ -500,6 +500,9 @@ something only six people will read.
 
 ### Things that will bite
 
+- **The user's desktop is `C:\Users\kayse\OneDrive\Masaüstü`, not `C:\Users\kayse\Desktop`.**
+  The latter exists but is a stale leftover folder that the user never sees. Anything
+  asked for "on my desktop" goes to the OneDrive path.
 - `rm` and `cp` are sudo-wrapper aliases. Scripted use must be `/usr/bin/rm`,
   `/usr/bin/cp`. A bare `cp` leaves a stray directory named after its destination.
 - `paper/` must never be committed. The repo is public and that directory holds consent
