@@ -9,9 +9,9 @@ consumes a fire-centred patch of environmental driver channels and emits a per-p
 probability map.
 
 > **Türkçe okur için.** Bu belge, uluslararası okur ve IAC değerlendiricileri için
-> İngilizce yazılmıştır; bölüm başlıkları iki dillidir. Konunun sıfırdan anlatıldığı tam
-> Türkçe eğitim rehberi için **[`docs/REHBER_TR.md`](docs/REHBER_TR.md)** dosyasına
-> bakınız (İngilizce muadili: [`docs/GUIDE_EN.md`](docs/GUIDE_EN.md)).
+> İngilizce yazılmıştır; bölüm başlıkları iki dillidir. Kod içindeki yorumlar ve
+> `noteboks/` altındaki defterler de iki dillidir; yöntemin tamamı 3–8. bölümlerde
+> anlatılmıştır.
 
 ---
 
@@ -622,16 +622,15 @@ models/
   spread_unet.pt              trained weights
   norm_stats.json             normalisation statistics, training split only
 
-docs/
-  GUIDE_EN.md                 36 000-word educational guide, English
-  REHBER_TR.md                Turkish counterpart
-  TANITIM.md                  outreach strategy
-
 outputs/reports/              generated HTML reports, scorecards, maps
 ```
 
 `paper/` is deliberately **not** tracked. This repository is public and that directory
 holds parental consent forms, CVs of six minors, and sponsorship correspondence.
+
+`docs/` is likewise untracked. It holds the team's long-form educational guides, the
+outreach strategy and the presentation drafts — internal working material written for the
+six authors rather than for publication.
 
 ## 13. Limitations and future work / Kısıtlar ve gelecek çalışma
 
@@ -672,5 +671,4 @@ against a physics-based spread model; evaluation against OGM perimeters if obtai
   45, RG2004.
 - Lin, T.-Y. et al. (2017). Focal Loss for Dense Object Detection. *ICCV 2017*.
 
-A fuller bibliography, with the reasoning behind each choice, is in
-[`docs/GUIDE_EN.md`](docs/GUIDE_EN.md) § 12.
+Each choice is justified where it is first used, in Sections 3 and 4.

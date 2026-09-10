@@ -411,10 +411,12 @@ src/train.py                       AdamW, cosine warm restarts, bf16, best val A
 src/baselines.py                   persistence, dilated, wind-directed growth
 src/evaluate.py                    TEST SPLIT ONLY, threshold calibrated on val,
                                    HTML/scorecard/folium ported from evaluate_spread.py
+docs/                              UNTRACKED since 10 Sep 2026 — on disk, .gitignored
 docs/GUIDE_EN.md                   36 k-word educational guide, English
 docs/REHBER_TR.md                  same guide, Turkish (3058 lines)
 docs/TANITIM.md                    outreach strategy: validate first, publicise second
 docs/sunum.html                    lay-audience presentation (also published as an Artifact)
+docs/talk_IAC2026.md               talk script, unpresented
 paper/                             manuscript, IAC guidelines, admin documents
 ```
 

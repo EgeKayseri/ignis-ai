@@ -93,10 +93,8 @@ Thumbs.db
 *~
 
 # Specific to Fire AI project
-# Generated reports and maps live under outputs/ (already ignored). Documentation
-# under docs/ may legitimately contain HTML and is tracked.
-# Üretilen rapor ve haritalar outputs/ altındadır (zaten yok sayılır). docs/ altındaki
-# belgeler meşru olarak HTML içerebilir ve takip edilir.
+# Generated reports and maps live under outputs/ (already ignored).
+# Üretilen rapor ve haritalar outputs/ altındadır (zaten yok sayılır).
 predictions.csv
 outputs/**/*.html
 *.pkl
@@ -119,6 +117,17 @@ credentials.json
 # kongre bildirisinin ne zaman dağıtılabileceğini IAF kuralları belirler.
 # Karar verdiğinizde tek tek `git add -f` ile bilinçli olarak yayımlayın.
 paper/
+
+# Internal team documentation. The long-form guides, the outreach strategy and the
+# presentation drafts are written for the six authors, not for publication, and the
+# talk script is unpresented material. They stay on disk and out of the public repo.
+# Publish an individual file deliberately with `git add -f` if you decide to.
+#
+# Ekibe yönelik iç belgeler. Uzun rehberler, tanıtım stratejisi ve sunum taslakları
+# altı yazar için yazıldı, yayımlanmak için değil; konuşma metni de henüz sunulmamış
+# bir malzeme. Diskte kalırlar, herkese açık depoya girmezler.
+# Karar verirseniz tek bir dosyayı `git add -f` ile bilinçli olarak yayımlayın.
+docs/
 
 # Local caches (regenerable, machine-specific). / Yerel önbellekler (yeniden üretilebilir).
 # graphify-out/ is rebuilt with `/graphify .`; ~/ignis-cache holds the memmap arrays.
