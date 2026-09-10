@@ -32,7 +32,7 @@ baseline — not an operational prediction system.
   Interactive Presentations. 77th International Astronautical Congress,
   Antalya, 5–9 October 2026. Final manuscript due **14 September 2026**.
 - **Authors:** six students at Antalya Yusuf Ziya Öner Science High School.
-- **Repository:** `github.com/WhiteFoxYT/ignis-ai`
+- **Repository:** `github.com/EgeKayseri/ignis-ai`
 
 ---
 

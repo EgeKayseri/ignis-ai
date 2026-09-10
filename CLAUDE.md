@@ -17,7 +17,7 @@ is much harder. Never conflate the two — the distinction is load-bearing in th
 - **Final manuscript deadline: 14 September 2026.** Everything is scheduled against this.
 - **Authors:** six students at Antalya Yusuf Ziya Öner Science High School. Explain
   reasoning; do not assume ML or remote-sensing background.
-- **Repo:** `github.com/WhiteFoxYT/ignis-ai`
+- **Repo:** `github.com/EgeKayseri/ignis-ai`
 - **Manuscript:** `paper/ignispaperfinal4.docx` — the live one, fully on v5 numbers.
   Read it before changing any scientific claim (extract `word/document.xml` with
   `zipfile`). `IGNIS_IAC2026_manuscript.docx` is the superseded 11 August draft and
