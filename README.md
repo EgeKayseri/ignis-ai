@@ -34,6 +34,17 @@ baseline — not an operational prediction system.
 - **Authors:** six students at Antalya Yusuf Ziya Öner Science High School.
 - **Repository:** `github.com/EgeKayseri/ignis-ai`
 
+**Relationship to the paper / Makale ile ilişkisi.** This repository is the software and
+data record for the manuscript above. It is a code repository, not a preprint: it
+documents how the reported numbers are reproduced, while the manuscript presents and
+interprets them. Where wording overlaps between the two, the repository is the authors'
+own prior working record of the same project.
+
+> Bu depo, yukarıdaki bildirinin yazılım ve veri kaydıdır; bir ön baskı (preprint)
+> değildir. Depo sayıların nasıl yeniden üretileceğini belgeler, makale ise onları sunar
+> ve yorumlar. İkisi arasındaki ifade örtüşmeleri, yazarların aynı projeye ait kendi
+> önceki çalışma kaydından kaynaklanır.
+
 ---
 
 ## Contents / İçindekiler
