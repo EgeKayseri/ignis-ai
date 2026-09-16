@@ -9,8 +9,7 @@ consumes a fire-centred patch of environmental driver channels and emits a per-p
 probability map.
 
 > **Türkçe okur için.** Bu belge, uluslararası okur ve IAC değerlendiricileri için
-> İngilizce yazılmıştır; bölüm başlıkları iki dillidir. Kod içindeki yorumlar ve
-> `noteboks/` altındaki defterler de iki dillidir; yöntemin tamamı 3–8. bölümlerde
+> İngilizce yazılmıştır; bölüm başlıkları iki dillidir. Kod içindeki yorumlar da iki dillidir; yöntemin tamamı 3–8. bölümlerde
 > anlatılmıştır.
 
 ---
